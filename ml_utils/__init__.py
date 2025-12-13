@@ -6,7 +6,8 @@ from .clustering import (
     apply_kmeans,
     apply_hierarchical,
     apply_dbscan,
-    extract_top_keywords
+    extract_top_keywords,
+    compute_centroids
 )
 from .predictor import NewsClusterPredictor
 
@@ -17,5 +18,6 @@ __all__ = [
     'apply_hierarchical',
     'apply_dbscan',
     'extract_top_keywords',
+    'compute_centroids',
     'NewsClusterPredictor'
 ]
