@@ -6,6 +6,8 @@ Run this file to start the web server
 import os
 import pickle
 import re
+import numpy as np
+from sklearn.metrics.pairwise import euclidean_distances
 from flask import Flask, render_template_string, request, jsonify
 
 # Configuration
@@ -50,7 +52,7 @@ def preprocess_text(text):
     return text
 
 
-def predict_cluster(text):
+def predict_cluster(text, model_type='kmeans'):
     """Predict cluster for given text"""
     if not model_loaded or not predictor_data:
         return None
@@ -59,24 +61,75 @@ def predict_cluster(text):
         # Preprocess the text
         processed_text = preprocess_text(text)
         
-        # Get model components
-        model = predictor_data['model']
+        # Get common components
         vectorizer = predictor_data['vectorizer']
-        cluster_keywords = predictor_data.get('cluster_keywords', {})
         
         # Transform text using the vectorizer
         text_vector = vectorizer.transform([processed_text])
         
-        # Predict cluster
-        cluster = model.predict(text_vector)[0]
+        # Get specific model data
+        models_data = predictor_data.get('models', {})
         
-        # Get keywords for this cluster
-        keywords = cluster_keywords.get(cluster, [])[:10]
-        
+        # Handle legacy model format if necessary
+        if 'models' not in predictor_data and 'model' in predictor_data:
+             # Fallback for old model format (only K-Means)
+             model_data = {
+                 'model': predictor_data['model'],
+                 'keywords': predictor_data.get('cluster_keywords', {})
+             }
+             model_type = 'kmeans' # Force kmeans
+        else:
+            if model_type not in models_data:
+                model_type = 'kmeans' # Default
+            model_data = models_data[model_type]
+
+        cluster = -1
+        confidence = 0.0
+        keywords = []
+
+        if model_type == 'kmeans':
+            model = model_data['model']
+            # Predict cluster
+            cluster = model.predict(text_vector)[0]
+            # Calculate confidence based on distance to centroid
+            distances = model.transform(text_vector)
+            min_dist = distances[0][cluster]
+            confidence = 1.0 / (1.0 + min_dist) # Simple heuristic
+            
+            keywords = model_data['keywords'].get(cluster, [])[:10]
+
+        elif model_type in ['hierarchical', 'dbscan']:
+            # For these, we use nearest centroid classification
+            centroids_dict = model_data.get('centroids', {})
+            
+            if not centroids_dict:
+                return {
+                    'cluster': -1,
+                    'confidence': 0.0,
+                    'keywords': [],
+                    'message': f"No clusters found for {model_type} (noise only or empty)"
+                }
+
+            # Convert centroids dict to array for distance calculation
+            labels = list(centroids_dict.keys())
+            centroids = np.array(list(centroids_dict.values()))
+            
+            # Calculate distances
+            distances = euclidean_distances(text_vector, centroids)
+            min_idx = np.argmin(distances)
+            min_dist = distances[0][min_idx]
+            
+            cluster = labels[min_idx]
+            confidence = 1.0 / (1.0 + min_dist)
+            
+            keywords = model_data['keywords'].get(cluster, [])[:10]
+
         return {
             'cluster': int(cluster),
+            'confidence': float(confidence),
             'keywords': keywords,
-            'processed_text': processed_text[:200] + '...' if len(processed_text) > 200 else processed_text
+            'processed_text': processed_text[:200] + '...' if len(processed_text) > 200 else processed_text,
+            'model_used': model_type
         }
     except Exception as e:
         print(f"Prediction error: {e}")
@@ -175,16 +228,37 @@ HTML_TEMPLATE = '''
             gap: 10px;
         }
 
-        /* Textarea */
-        .input-group {
+        /* Form Elements */
+        .form-group {
             margin-bottom: 20px;
         }
 
-        .input-group label {
+        .form-group label {
             display: block;
             margin-bottom: 10px;
             color: #ccc;
             font-size: 0.95rem;
+        }
+
+        select {
+            width: 100%;
+            padding: 12px;
+            border-radius: 10px;
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            background: rgba(0, 0, 0, 0.3);
+            color: #fff;
+            font-size: 1rem;
+            outline: none;
+            cursor: pointer;
+        }
+
+        select:focus {
+            border-color: #4facfe;
+        }
+
+        select option {
+            background: #16213e;
+            color: #fff;
         }
 
         textarea {
@@ -221,6 +295,7 @@ HTML_TEMPLATE = '''
             display: flex;
             gap: 15px;
             flex-wrap: wrap;
+            margin-top: 20px;
         }
 
         .btn {
@@ -522,7 +597,16 @@ HTML_TEMPLATE = '''
         <div class="main-card">
             <h2 class="section-title"><i class="fas fa-magic"></i> Predict Article Cluster</h2>
             
-            <div class="input-group">
+            <div class="form-group">
+                <label for="model-select">Select Clustering Model</label>
+                <select id="model-select">
+                    <option value="kmeans">K-Means (Default)</option>
+                    <option value="hierarchical">Hierarchical Clustering</option>
+                    <option value="dbscan">DBSCAN</option>
+                </select>
+            </div>
+
+            <div class="form-group">
                 <label for="article-input">Enter News Article Text</label>
                 <textarea 
                     id="article-input" 
@@ -573,6 +657,7 @@ HTML_TEMPLATE = '''
                         <div class="cluster-info">
                             <h4>Predicted Cluster</h4>
                             <p id="cluster-label">Category identified</p>
+                            <p id="confidence-score" style="color: #4facfe; font-size: 0.9rem; margin-top: 5px;">Confidence: 0%</p>
                         </div>
                     </div>
 
@@ -610,6 +695,7 @@ HTML_TEMPLATE = '''
 
         // DOM Elements
         const articleInput = document.getElementById('article-input');
+        const modelSelect = document.getElementById('model-select');
         const charCounter = document.getElementById('char-counter');
         const predictBtn = document.getElementById('predict-btn');
         const clearBtn = document.getElementById('clear-btn');
@@ -660,6 +746,7 @@ HTML_TEMPLATE = '''
         // Predict button
         predictBtn.addEventListener('click', async () => {
             const text = articleInput.value.trim();
+            const modelType = modelSelect.value;
             
             if (text.length < 10) {
                 showToast('Text is too short (minimum 10 characters)', 'error');
@@ -677,7 +764,7 @@ HTML_TEMPLATE = '''
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ text })
+                    body: JSON.stringify({ text, model_type: modelType })
                 });
 
                 const data = await response.json();
@@ -686,6 +773,11 @@ HTML_TEMPLATE = '''
                     // Display result
                     document.getElementById('cluster-number').textContent = data.cluster;
                     document.getElementById('cluster-label').textContent = `Cluster ${data.cluster} - Topic Category`;
+                    
+                    // Display confidence
+                    const confidencePercent = (data.confidence * 100).toFixed(1);
+                    document.getElementById('confidence-score').textContent = `Confidence: ${confidencePercent}%`;
+                    
                     document.getElementById('text-preview').textContent = data.processed_text || text.substring(0, 200) + '...';
                     
                     // Display keywords
@@ -707,6 +799,9 @@ HTML_TEMPLATE = '''
                     showToast('Prediction successful!', 'success');
                 } else {
                     showToast(data.error || 'Prediction failed', 'error');
+                    if (data.message) {
+                        console.log(data.message);
+                    }
                 }
             } catch (error) {
                 console.error('Error:', error);
@@ -746,6 +841,7 @@ def predict():
     try:
         data = request.get_json()
         text = data.get('text', '').strip()
+        model_type = data.get('model_type', 'kmeans')
         
         if not text:
             return jsonify({'error': 'No text provided'}), 400
@@ -754,7 +850,7 @@ def predict():
             return jsonify({'error': 'Text is too short (minimum 10 characters)'}), 400
         
         # Get prediction
-        result = predict_cluster(text)
+        result = predict_cluster(text, model_type)
         
         if result:
             return jsonify(result), 200

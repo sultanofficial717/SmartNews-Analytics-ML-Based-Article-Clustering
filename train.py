@@ -18,7 +18,10 @@ from ml_utils import (
     TextPreprocessor,
     extract_tfidf_features,
     apply_kmeans,
-    extract_top_keywords
+    apply_hierarchical,
+    apply_dbscan,
+    extract_top_keywords,
+    compute_centroids
 )
 
 # Configuration
@@ -34,6 +37,12 @@ DATA_DIR.mkdir(exist_ok=True)
 
 def load_news_data(csv_path='data/list.csv', text_folder='data/*.txt'):
     """Load news articles from CSV and text files"""
+    
+    # Check if csv_path exists, if not check if it exists in root
+    if not os.path.exists(csv_path) and os.path.exists(os.path.basename(csv_path)):
+        csv_path = os.path.basename(csv_path)
+        print(f"ℹ Found CSV in root directory: {csv_path}")
+
     df = pd.DataFrame()
     documents = []
 
@@ -92,7 +101,16 @@ def load_news_data(csv_path='data/list.csv', text_folder='data/*.txt'):
         print("Loading all .txt files...")
         filenames = []
         
-        for filepath in glob.glob(os.path.join(DATA_DIR, '*.txt')):
+        # Try data dir first
+        files = glob.glob(os.path.join(DATA_DIR, '*.txt'))
+        
+        # If no files in data dir, try root
+        if not files:
+             files = glob.glob('*.txt')
+             if files:
+                 print(f"ℹ Found {len(files)} text files in root directory")
+
+        for filepath in files:
             try:
                 with open(filepath, 'r', encoding='latin-1', errors='ignore') as f:
                     text = f.read()
@@ -101,6 +119,37 @@ def load_news_data(csv_path='data/list.csv', text_folder='data/*.txt'):
                         filenames.append(os.path.basename(filepath))
             except Exception as e:
                 print(f"  ⚠ Error reading {filepath}: {e}")
+
+        # Check if we loaded aggregated files as single documents
+        if len(documents) < 10 and files:
+            print("⚠ Few documents loaded. Checking if files are aggregated newsgroups...")
+            all_split_docs = []
+            all_filenames = []
+            
+            for filepath in files:
+                try:
+                    with open(filepath, 'r', encoding='latin-1', errors='ignore') as f:
+                        content = f.read()
+                        # Check if it looks like aggregated file
+                        if content.count('From: ') > 10:
+                            print(f"  ℹ Splitting aggregated file: {os.path.basename(filepath)}")
+                            # Split by "\nFrom: "
+                            parts = content.split('\nFrom: ')
+                            
+                            for i, part in enumerate(parts):
+                                if i > 0:
+                                    part = "From: " + part
+                                
+                                if len(part.strip()) > 100:
+                                    all_split_docs.append(part)
+                                    all_filenames.append(f"{os.path.basename(filepath)}_{i}")
+                except:
+                    pass
+            
+            if len(all_split_docs) > len(documents):
+                print(f"✓ Successfully split into {len(all_split_docs)} documents")
+                documents = all_split_docs
+                filenames = all_filenames
 
         if documents:
             # Create DataFrame from filenames
@@ -127,19 +176,18 @@ def load_news_data(csv_path='data/list.csv', text_folder='data/*.txt'):
     return df, documents
 
 
-def save_model(model, vectorizer, preprocessor, cluster_keywords):
-    """Save trained model"""
-    model_data = {
-        'model': model,
+def save_model(models_data, vectorizer, preprocessor):
+    """Save trained models"""
+    final_data = {
+        'models': models_data,
         'vectorizer': vectorizer,
-        'preprocessor': preprocessor,
-        'cluster_keywords': cluster_keywords
+        'preprocessor': preprocessor
     }
 
     with open(MODEL_PATH, 'wb') as f:
-        pickle.dump(model_data, f)
+        pickle.dump(final_data, f)
 
-    print(f"✓ Model saved to {MODEL_PATH}")
+    print(f"✓ Models saved to {MODEL_PATH}")
 
 
 def train_clustering_pipeline(n_clusters=5):
@@ -167,20 +215,52 @@ def train_clustering_pipeline(n_clusters=5):
     print("\n🔍 Extracting TF-IDF features...")
     X, feature_names, vectorizer = extract_tfidf_features(processed_docs, max_features=500)
 
-    # Step 4: Apply clustering
-    print(f"\n🎯 Applying K-Means clustering with {n_clusters} clusters...")
-    labels, model = apply_kmeans(X, n_clusters=n_clusters)
+    models_data = {}
 
-    # Step 5: Extract keywords
-    print("\n🏷️ Extracting cluster keywords...")
-    cluster_keywords = extract_top_keywords(X, feature_names, labels, n_keywords=10)
+    # Step 4a: Apply K-Means
+    print(f"\n🎯 Applying K-Means clustering with {n_clusters} clusters...")
+    kmeans_labels, kmeans_model = apply_kmeans(X, n_clusters=n_clusters)
+    kmeans_keywords = extract_top_keywords(X, feature_names, kmeans_labels, n_keywords=10)
+    
+    models_data['kmeans'] = {
+        'model': kmeans_model,
+        'keywords': kmeans_keywords,
+        'labels': kmeans_labels
+    }
+
+    # Step 4b: Apply Hierarchical
+    print(f"\n🎯 Applying Hierarchical clustering with {n_clusters} clusters...")
+    hier_labels, hier_model = apply_hierarchical(X, n_clusters=n_clusters)
+    hier_keywords = extract_top_keywords(X, feature_names, hier_labels, n_keywords=10)
+    hier_centroids = compute_centroids(X, hier_labels)
+
+    models_data['hierarchical'] = {
+        'model': hier_model,
+        'keywords': hier_keywords,
+        'centroids': hier_centroids,
+        'labels': hier_labels
+    }
+
+    # Step 4c: Apply DBSCAN
+    # Heuristic for eps: usually around 0.5-0.8 for cosine distance (TF-IDF)
+    print(f"\n🎯 Applying DBSCAN clustering...")
+    dbscan_labels, dbscan_model = apply_dbscan(X, eps=0.5, min_samples=2) # min_samples=2 for small dataset
+    dbscan_keywords = extract_top_keywords(X, feature_names, dbscan_labels, n_keywords=10)
+    dbscan_centroids = compute_centroids(X, dbscan_labels)
+
+    models_data['dbscan'] = {
+        'model': dbscan_model,
+        'keywords': dbscan_keywords,
+        'centroids': dbscan_centroids,
+        'labels': dbscan_labels
+    }
 
     # Step 6: Save model
-    print("\n💾 Saving model...")
-    save_model(model, vectorizer, preprocessor, cluster_keywords)
+    print("\n💾 Saving models...")
+    save_model(models_data, vectorizer, preprocessor)
 
-    # Add cluster labels to dataframe
-    df['cluster'] = labels
+    # Add K-Means cluster labels to dataframe (default)
+    df['cluster'] = kmeans_labels
 
     # Save results
     results_path = BASE_DIR / 'clustered_results.csv'
@@ -192,7 +272,7 @@ def train_clustering_pipeline(n_clusters=5):
     print("="*70)
     print(f"\nModel Statistics:")
     print(f"  • Total documents: {len(documents)}")
-    print(f"  • Clusters: {n_clusters}")
+    print(f"  • Clusters (K-Means/Hierarchical): {n_clusters}")
     print(f"  • Features: {X.shape[1]}")
     print(f"  • Model path: {MODEL_PATH}")
     print("\nYou can now start the Flask app with: python -m app.app")
