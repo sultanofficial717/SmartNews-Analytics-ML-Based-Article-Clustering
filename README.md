@@ -33,10 +33,13 @@ It uses **Unsupervised Learning**, meaning the model learns patterns and relatio
 - **ML Pipelines**: Building a robust training and inference workflow.
 - **Web Deployment**: Serving an ML model via a Flask API and UI.
 
+> **Note on Data**: Unlike many tutorials that use pre-cleaned datasets (like Kaggle or 20 Newsgroups), this project uses **real-world, raw data** that was manually scraped from various news sources. This demonstrates the challenges and reality of working with custom datasets in a professional environment.
+
 ---
 
 ## 🌟 Key Features
 
+*   **Custom Scraped Dataset**: Built on a unique collection of articles covering Business, Crime, Medical, Politics, Religion, Sports, and Technology.
 *   **Multi-Algorithm Support**: Switch between K-Means, Hierarchical, and DBSCAN clustering.
 *   **Advanced NLP Pipeline**: Includes text cleaning, stopword removal, stemming, and TF-IDF vectorization.
 *   **Hybrid Feature Extraction**: Supports both traditional **TF-IDF** and modern **LLM Embeddings** (via OpenRouter/Mistral).
@@ -50,22 +53,27 @@ It uses **Unsupervised Learning**, meaning the model learns patterns and relatio
 
 If you are new to ML, here is what's happening under the hood:
 
-### 1. Text Preprocessing (`ml_utils/preprocessor.py`)
+### 1. The Dataset (Real-World vs. Kaggle)
+Most beginners start with "clean" datasets (CSV files with perfect columns). In the real world, data is messy.
+- **Our Data**: We scraped raw text files (`business.txt`, `technology.txt`, `crimes.txt`, etc.) from the web.
+- **The Challenge**: The model must figure out that `sports.txt` and `sports 1.txt` belong to the same category purely by reading the words inside them, without being told the file names.
+
+### 2. Text Preprocessing (`ml_utils/preprocessor.py`)
 Computers can't understand text, so we clean it first:
 - **Lowercasing**: "Apple" and "apple" become the same.
 - **Noise Removal**: Removing URLs, emails, and special characters.
 - **Stopword Removal**: Removing common words like "the", "is", "and" that carry little meaning.
 - **Stemming**: Reducing words to their root (e.g., "running" -> "run").
 
-### 2. Feature Extraction (`ml_utils/clustering.py`)
+### 3. Feature Extraction (`ml_utils/clustering.py`)
 We convert text into numbers (vectors):
 - **TF-IDF (Term Frequency-Inverse Document Frequency)**: Gives weight to unique words in a document while downplaying common words across all documents.
 - **Embeddings (Optional)**: Uses a Large Language Model (Mistral) to understand the *semantic meaning* of sentences, not just keyword matching.
 
-### 3. Dimensionality Reduction (`ml_utils/clustering.py`)
+### 4. Dimensionality Reduction (`ml_utils/clustering.py`)
 - **LSA (Latent Semantic Analysis)**: Reduces the number of features (from thousands of words to ~100 components) to make clustering faster and more accurate by capturing "concepts" rather than just words.
 
-### 4. Clustering Algorithms
+### 5. Clustering Algorithms
 - **K-Means**: The default. It tries to find `K` centers (centroids) and assigns every document to the nearest center. Good for general topics.
 - **Hierarchical**: Builds a tree of clusters. Good for seeing how topics relate to sub-topics.
 - **DBSCAN**: Groups dense regions of points. Good for finding outliers (noise) and handling irregular cluster shapes.
