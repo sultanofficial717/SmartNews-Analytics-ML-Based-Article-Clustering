@@ -4,6 +4,9 @@ import numpy as np
 from sklearn.cluster import KMeans, AgglomerativeClustering, DBSCAN
 from sklearn.metrics import silhouette_score, davies_bouldin_score
 from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.decomposition import TruncatedSVD
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import Normalizer
 
 
 def extract_tfidf_features(documents, max_features=1000, ngram_range=(1, 2)):

@@ -9,6 +9,11 @@ import re
 import numpy as np
 from sklearn.metrics.pairwise import euclidean_distances
 from flask import Flask, render_template_string, request, jsonify
+from dotenv import load_dotenv
+from ml_utils import OpenRouterEmbeddingGenerator, NewsClusterPredictor
+
+# Load environment variables
+load_dotenv()
 
 # Configuration
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -64,8 +69,21 @@ def predict_cluster(text, model_type='kmeans'):
         # Get common components
         vectorizer = predictor_data['vectorizer']
         
-        # Transform text using the vectorizer
-        text_vector = vectorizer.transform([processed_text])
+        # Handle legacy model format
+        if 'models' not in predictor_data and 'model' in predictor_data:
+             model_data = {
+                 'model': predictor_data['model'],
+                 'keywords': predictor_data.get('cluster_keywords', {})
+             }
+             model_type = 'kmeans'
+        else:
+             if model_type not in models_data:
+                model_type = 'kmeans'
+             model_data = models_data[model_type]
+             
+        model = model_data['model']
+        keywords = model_data.get('keywords', {})
+        centroids = model_data.get('centroids')
         
         # Get specific model data
         models_data = predictor_data.get('models', {})

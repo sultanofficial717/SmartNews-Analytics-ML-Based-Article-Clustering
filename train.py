@@ -10,6 +10,10 @@ import os
 import pickle
 import sys
 from pathlib import Path
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 # Add parent directory to path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -29,6 +33,14 @@ BASE_DIR = Path(__file__).parent
 DATA_DIR = BASE_DIR / 'data'
 MODELS_DIR = BASE_DIR / 'models'
 MODEL_PATH = MODELS_DIR / 'news_clustering_model.pkl'
+
+# API Configuration
+API_KEY = os.getenv("OPENROUTER_API_KEY")
+if not API_KEY:
+    print("⚠ Warning: OPENROUTER_API_KEY not found in environment variables.")
+    print("  Embeddings will not be generated (falling back to TF-IDF).")
+    
+EMBEDDING_MODEL = "mistralai/devstral-2512"
 
 # Create directories if they don't exist
 MODELS_DIR.mkdir(exist_ok=True)
@@ -190,7 +202,7 @@ def save_model(models_data, vectorizer, preprocessor):
     print(f"✓ Models saved to {MODEL_PATH}")
 
 
-def train_clustering_pipeline(n_clusters=5):
+def train_clustering_pipeline(n_clusters=8):
     """Complete training pipeline"""
     print("\n" + "="*70)
     print("NEWS ARTICLE CLUSTERING - TRAINING PIPELINE")
@@ -275,7 +287,7 @@ def train_clustering_pipeline(n_clusters=5):
     print(f"  • Clusters (K-Means/Hierarchical): {n_clusters}")
     print(f"  • Features: {X.shape[1]}")
     print(f"  • Model path: {MODEL_PATH}")
-    print("\nYou can now start the Flask app with: python -m app.app")
+    print("\nYou can now start the Flask app with: python run_app.py")
     print("="*70 + "\n")
 
     return True
@@ -285,8 +297,8 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(description='Train news clustering model')
-    parser.add_argument('--clusters', type=int, default=5,
-                        help='Number of clusters (default: 5)')
+    parser.add_argument('--clusters', type=int, default=8,
+                        help='Number of clusters (default: 8)')
     args = parser.parse_args()
 
     success = train_clustering_pipeline(n_clusters=args.clusters)

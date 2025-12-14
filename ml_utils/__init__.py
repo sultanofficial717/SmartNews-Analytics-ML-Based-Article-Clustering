@@ -7,9 +7,12 @@ from .clustering import (
     apply_hierarchical,
     apply_dbscan,
     extract_top_keywords,
+    compute_centroids,
+    reduce_dimensions
     compute_centroids
 )
 from .predictor import NewsClusterPredictor
+from .embeddings import OpenRouterEmbeddingGenerator
 
 __all__ = [
     'TextPreprocessor',
@@ -19,5 +22,8 @@ __all__ = [
     'apply_dbscan',
     'extract_top_keywords',
     'compute_centroids',
+    'reduce_dimensions',
+    'NewsClusterPredictor',
+    'OpenRouterEmbeddingGenerator'
     'NewsClusterPredictor'
 ]
