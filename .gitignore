@@ -91,3 +91,8 @@ Thumbs.db
 # Project specific
 clustered_results.csv
 news_clustering_model.pkl
+
+models/*.pkl
+clustered_results.csv
+__pycache__/
+*.pyc

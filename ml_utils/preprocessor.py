@@ -5,7 +5,7 @@ import string
 import nltk
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
-from nltk.stem import WordNetLemmatizer
+from nltk.stem import PorterStemmer
 
 # Download required NLTK data
 try:
@@ -18,10 +18,11 @@ try:
 except LookupError:
     nltk.download('stopwords')
 
-try:
-    nltk.data.find('corpora/wordnet')
-except LookupError:
-    nltk.download('wordnet')
+# WordNet not needed for PorterStemmer
+# try:
+#     nltk.data.find('corpora/wordnet')
+# except LookupError:
+#     nltk.download('wordnet')
 
 try:
     nltk.data.find('taggers/averaged_perceptron_tagger')
@@ -38,7 +39,7 @@ class TextPreprocessor:
     """Preprocess text for clustering"""
 
     def __init__(self):
-        self.lemmatizer = WordNetLemmatizer()
+        self.stemmer = PorterStemmer()
         self.stop_words = set(stopwords.words('english'))
         # Add common words that don't add meaning
         self.stop_words.update(['said', 'would', 'could', 'also', 'may', 'might'])
@@ -66,18 +67,18 @@ class TextPreprocessor:
         return text
 
     def tokenize_and_lemmatize(self, text):
-        """Tokenize and lemmatize text"""
+        """Tokenize and stem text"""
         # Tokenize
         tokens = word_tokenize(text)
 
-        # Remove stopwords and lemmatize
-        lemmatized = [
-            self.lemmatizer.lemmatize(token)
+        # Remove stopwords and stem
+        stemmed = [
+            self.stemmer.stem(token)
             for token in tokens
             if token not in self.stop_words and len(token) > 2
         ]
 
-        return ' '.join(lemmatized)
+        return ' '.join(stemmed)
 
     def preprocess(self, text):
         """Complete preprocessing pipeline"""
