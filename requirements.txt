@@ -1,0 +1,11 @@
+flask
+werkzeug
+pandas
+numpy
+scikit-learn
+nltk
+matplotlib
+seaborn
+scipy
+python-dotenv
+gunicorn
