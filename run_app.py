@@ -9,7 +9,11 @@ import re
 import numpy as np
 from sklearn.metrics.pairwise import euclidean_distances
 from flask import Flask, render_template_string, request, jsonify
+from dotenv import load_dotenv
 from ml_utils import OpenRouterEmbeddingGenerator, NewsClusterPredictor
+
+# Load environment variables
+load_dotenv()
 
 # Configuration
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))

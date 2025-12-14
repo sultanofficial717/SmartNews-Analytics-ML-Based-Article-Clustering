@@ -10,6 +10,10 @@ import os
 import pickle
 import sys
 from pathlib import Path
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 # Add parent directory to path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -33,7 +37,11 @@ MODELS_DIR = BASE_DIR / 'models'
 MODEL_PATH = MODELS_DIR / 'news_clustering_model.pkl'
 
 # API Configuration
-API_KEY = os.getenv("OPENROUTER_API_KEY", "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")
+API_KEY = os.getenv("OPENROUTER_API_KEY")
+if not API_KEY:
+    print("⚠ Warning: OPENROUTER_API_KEY not found in environment variables.")
+    print("  Embeddings will not be generated (falling back to TF-IDF).")
+    
 EMBEDDING_MODEL = "mistralai/devstral-2512"
 
 # Create directories if they don't exist
