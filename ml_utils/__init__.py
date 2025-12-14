@@ -9,6 +9,7 @@ from .clustering import (
     extract_top_keywords,
     compute_centroids,
     reduce_dimensions
+    compute_centroids
 )
 from .predictor import NewsClusterPredictor
 from .embeddings import OpenRouterEmbeddingGenerator
@@ -24,4 +25,5 @@ __all__ = [
     'reduce_dimensions',
     'NewsClusterPredictor',
     'OpenRouterEmbeddingGenerator'
+    'NewsClusterPredictor'
 ]
