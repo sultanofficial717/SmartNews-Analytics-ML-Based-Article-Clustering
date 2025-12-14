@@ -9,3 +9,4 @@ seaborn
 scipy
 python-dotenv
 gunicorn
+requests
