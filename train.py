@@ -29,9 +29,7 @@ from ml_utils import (
     apply_hierarchical,
     apply_dbscan,
     extract_top_keywords,
-    compute_centroids,
-    reduce_dimensions,
-    OpenRouterEmbeddingGenerator
+    compute_centroids
 )
 
 # Configuration
@@ -223,14 +221,12 @@ def load_news_data(csv_path='data/list.csv', text_folder='data/*.txt'):
     return df, documents
 
 
-def save_model(models_data, vectorizer, preprocessor, lsa_model=None, embedding_config=None):
+def save_model(models_data, vectorizer, preprocessor):
     """Save trained models"""
     final_data = {
         'models': models_data,
         'vectorizer': vectorizer,
-        'preprocessor': preprocessor,
-        'lsa': lsa_model,
-        'embedding_config': embedding_config
+        'preprocessor': preprocessor
     }
 
     with open(MODEL_PATH, 'wb') as f:
@@ -261,37 +257,15 @@ def train_clustering_pipeline(n_clusters=5):
     processed_docs = preprocessor.preprocess_documents(documents)
 
     # Step 3: Extract features
-    print("\n🔍 Extracting TF-IDF features (for keywords)...")
-    X_tfidf, feature_names, vectorizer = extract_tfidf_features(processed_docs, max_features=500)
-
-    # Step 3b: Dimensionality Reduction (LSA) - Fallback
-    print("\n📉 Reducing dimensions (LSA) - Fallback/Baseline...")
-    X_lsa, lsa_model = reduce_dimensions(X_tfidf, n_components=100)
-
-    # Step 3c: Sentence Embeddings (API)
-    print("\n🧠 Fetching Sentence Embeddings (Mistral/OpenRouter)...")
-    embedding_generator = OpenRouterEmbeddingGenerator(api_key=API_KEY, model=EMBEDDING_MODEL)
-    X_embeddings = embedding_generator.get_embeddings_batch(processed_docs)
-
-    embedding_config = None
-    if X_embeddings is not None and len(X_embeddings) == len(documents):
-        print(f"✓ Successfully fetched embeddings. Shape: {X_embeddings.shape}")
-        X_features = X_embeddings
-        embedding_config = {
-            'api_key': API_KEY,
-            'model': EMBEDDING_MODEL
-        }
-    else:
-        print("⚠ Failed to fetch embeddings. Falling back to TF-IDF + LSA.")
-        X_features = X_lsa
+    print("\n🔍 Extracting TF-IDF features...")
+    X, feature_names, vectorizer = extract_tfidf_features(processed_docs, max_features=500)
 
     models_data = {}
 
     # Step 4a: Apply K-Means
     print(f"\n🎯 Applying K-Means clustering with {n_clusters} clusters...")
-    kmeans_labels, kmeans_model = apply_kmeans(X_features, n_clusters=n_clusters)
-    # Use original TF-IDF for keywords
-    kmeans_keywords = extract_top_keywords(X_tfidf, feature_names, kmeans_labels, n_keywords=10)
+    kmeans_labels, kmeans_model = apply_kmeans(X, n_clusters=n_clusters)
+    kmeans_keywords = extract_top_keywords(X, feature_names, kmeans_labels, n_keywords=10)
     
     models_data['kmeans'] = {
         'model': kmeans_model,
@@ -305,9 +279,9 @@ def train_clustering_pipeline(n_clusters=5):
 
     # Step 4b: Apply Hierarchical
     print(f"\n🎯 Applying Hierarchical clustering with {n_clusters} clusters...")
-    hier_labels, hier_model = apply_hierarchical(X_features, n_clusters=n_clusters)
-    hier_keywords = extract_top_keywords(X_tfidf, feature_names, hier_labels, n_keywords=10)
-    hier_centroids = compute_centroids(X_features, hier_labels)
+    hier_labels, hier_model = apply_hierarchical(X, n_clusters=n_clusters)
+    hier_keywords = extract_top_keywords(X, feature_names, hier_labels, n_keywords=10)
+    hier_centroids = compute_centroids(X, hier_labels)
 
     models_data['hierarchical'] = {
         'model': hier_model,
@@ -317,14 +291,11 @@ def train_clustering_pipeline(n_clusters=5):
     }
 
     # Step 4c: Apply DBSCAN
+    # Heuristic for eps: usually around 0.5-0.8 for cosine distance (TF-IDF)
     print(f"\n🎯 Applying DBSCAN clustering...")
-    # For embeddings (cosine similarity is better, but DBSCAN uses euclidean by default)
-    # Embeddings are usually normalized, so euclidean distance is related to cosine similarity.
-    # dist = sqrt(2(1-cos)). If cos=0.7 (similar), dist=sqrt(0.6)=0.77. If cos=0.3, dist=sqrt(1.4)=1.18.
-    # So eps around 0.8-1.0 is reasonable.
-    dbscan_labels, dbscan_model = apply_dbscan(X_features, eps=0.8, min_samples=2) 
-    dbscan_keywords = extract_top_keywords(X_tfidf, feature_names, dbscan_labels, n_keywords=10)
-    dbscan_centroids = compute_centroids(X_features, dbscan_labels)
+    dbscan_labels, dbscan_model = apply_dbscan(X, eps=0.5, min_samples=2) # min_samples=2 for small dataset
+    dbscan_keywords = extract_top_keywords(X, feature_names, dbscan_labels, n_keywords=10)
+    dbscan_centroids = compute_centroids(X, dbscan_labels)
 
     models_data['dbscan'] = {
         'model': dbscan_model,
@@ -335,7 +306,7 @@ def train_clustering_pipeline(n_clusters=5):
 
     # Step 6: Save model
     print("\n💾 Saving models...")
-    save_model(models_data, vectorizer, preprocessor, lsa_model, embedding_config)
+    save_model(models_data, vectorizer, preprocessor)
 
     # Add K-Means cluster labels to dataframe (default)
     df['cluster'] = kmeans_labels
@@ -351,8 +322,7 @@ def train_clustering_pipeline(n_clusters=5):
     print(f"\nModel Statistics:")
     print(f"  • Total documents: {len(documents)}")
     print(f"  • Clusters (K-Means/Hierarchical): {n_clusters}")
-    print(f"  • Features Used: {'Embeddings' if embedding_config else 'TF-IDF+LSA'}")
-    print(f"  • Feature Dim: {X_features.shape[1]}")
+    print(f"  • Features: {X.shape[1]}")
     print(f"  • Model path: {MODEL_PATH}")
     print("\nYou can now start the Flask app with: python run_app.py")
     print("="*70 + "\n")

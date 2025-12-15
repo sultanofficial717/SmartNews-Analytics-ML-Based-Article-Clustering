@@ -46,18 +46,28 @@ def load_model():
         return False
 
 
+def preprocess_text(text):
+    """Basic text preprocessing"""
+    # Convert to lowercase
+    text = text.lower()
+    # Remove special characters and digits
+    text = re.sub(r'[^a-zA-Z\s]', '', text)
+    # Remove extra whitespace
+    text = ' '.join(text.split())
+    return text
+
+
 def predict_cluster(text, model_type='kmeans'):
     """Predict cluster for given text"""
     if not model_loaded or not predictor_data:
         return None
     
     try:
-        # Get components
-        vectorizer = predictor_data.get('vectorizer')
-        preprocessor = predictor_data.get('preprocessor')
-        lsa_model = predictor_data.get('lsa')
-        embedding_config = predictor_data.get('embedding_config')
-        models_data = predictor_data.get('models', {})
+        # Preprocess the text
+        processed_text = preprocess_text(text)
+        
+        # Get common components
+        vectorizer = predictor_data['vectorizer']
         
         # Handle legacy model format
         if 'models' not in predictor_data and 'model' in predictor_data:
@@ -75,21 +85,70 @@ def predict_cluster(text, model_type='kmeans'):
         keywords = model_data.get('keywords', {})
         centroids = model_data.get('centroids')
         
-        # Initialize predictor
-        predictor = NewsClusterPredictor(
-            model=model,
-            vectorizer=vectorizer,
-            preprocessor=preprocessor,
-            cluster_keywords=keywords,
-            lsa_model=lsa_model,
-            embedding_config=embedding_config,
-            centroids=centroids
-        )
+        # Get specific model data
+        models_data = predictor_data.get('models', {})
         
-        result = predictor.predict_with_details(text)
-        result['model_used'] = model_type
-        return result
-        
+        # Handle legacy model format if necessary
+        if 'models' not in predictor_data and 'model' in predictor_data:
+             # Fallback for old model format (only K-Means)
+             model_data = {
+                 'model': predictor_data['model'],
+                 'keywords': predictor_data.get('cluster_keywords', {})
+             }
+             model_type = 'kmeans' # Force kmeans
+        else:
+            if model_type not in models_data:
+                model_type = 'kmeans' # Default
+            model_data = models_data[model_type]
+
+        cluster = -1
+        confidence = 0.0
+        keywords = []
+
+        if model_type == 'kmeans':
+            model = model_data['model']
+            # Predict cluster
+            cluster = model.predict(text_vector)[0]
+            # Calculate confidence based on distance to centroid
+            distances = model.transform(text_vector)
+            min_dist = distances[0][cluster]
+            confidence = 1.0 / (1.0 + min_dist) # Simple heuristic
+            
+            keywords = model_data['keywords'].get(cluster, [])[:10]
+
+        elif model_type in ['hierarchical', 'dbscan']:
+            # For these, we use nearest centroid classification
+            centroids_dict = model_data.get('centroids', {})
+            
+            if not centroids_dict:
+                return {
+                    'cluster': -1,
+                    'confidence': 0.0,
+                    'keywords': [],
+                    'message': f"No clusters found for {model_type} (noise only or empty)"
+                }
+
+            # Convert centroids dict to array for distance calculation
+            labels = list(centroids_dict.keys())
+            centroids = np.array(list(centroids_dict.values()))
+            
+            # Calculate distances
+            distances = euclidean_distances(text_vector, centroids)
+            min_idx = np.argmin(distances)
+            min_dist = distances[0][min_idx]
+            
+            cluster = labels[min_idx]
+            confidence = 1.0 / (1.0 + min_dist)
+            
+            keywords = model_data['keywords'].get(cluster, [])[:10]
+
+        return {
+            'cluster': int(cluster),
+            'confidence': float(confidence),
+            'keywords': keywords,
+            'processed_text': processed_text[:200] + '...' if len(processed_text) > 200 else processed_text,
+            'model_used': model_type
+        }
     except Exception as e:
         print(f"Prediction error: {e}")
         return None

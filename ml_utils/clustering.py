@@ -32,29 +32,6 @@ def extract_tfidf_features(documents, max_features=1000, ngram_range=(1, 2)):
     return X.toarray(), feature_names, vectorizer
 
 
-def reduce_dimensions(X, n_components=100):
-    """Reduce dimensions using LSA (TruncatedSVD)"""
-    # Adjust n_components if we have fewer samples/features
-    n_samples, n_features = X.shape
-    n_components = min(n_components, n_features - 1, n_samples - 1)
-    
-    if n_components < 2:
-        n_components = 2
-        
-    print(f"Reducing dimensions to {n_components} components...")
-    
-    # LSA pipeline: SVD + Normalization
-    svd = TruncatedSVD(n_components=n_components, random_state=42)
-    normalizer = Normalizer(copy=False)
-    lsa = make_pipeline(svd, normalizer)
-    
-    X_reduced = lsa.fit_transform(X)
-    explained_variance = svd.explained_variance_ratio_.sum()
-    print(f"Explained variance: {explained_variance:.2%}")
-    
-    return X_reduced, lsa
-
-
 def compute_centroids(X, labels):
     """Compute centroids for clusters"""
     unique_labels = set(labels)
