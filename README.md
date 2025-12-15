@@ -94,13 +94,13 @@ SmartNews-Analytics/
 ├── .env                    # 🔐 API Keys (Not committed to Git)
 ├── Dockerfile              # 🐳 Docker configuration
 ├── requirements.txt        # 📦 Python dependencies
-├── run_app.py              # 🚀 Flask Web Application
+├── run_app.py              #    Flask Web Application
 └── train.py                # 🚂 Model Training Script
 ```
 
 ---
 
-## ⚡ Installation & Setup
+##  Installation & Setup
 
 ### Prerequisites
 - Python 3.8 or higher
@@ -142,7 +142,7 @@ OPENROUTER_API_KEY=your_key_here
 
 ---
 
-## 🚀 Usage Guide
+##  Usage Guide
 
 ### Step 1: Train the Model
 Before you can predict, you must train the model on your data.
