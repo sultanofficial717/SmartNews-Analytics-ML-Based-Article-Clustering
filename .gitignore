@@ -62,7 +62,6 @@ coverage.xml
 
 # Models and Data
 models/*.pkl
-data/
 uploads/
 *.pkl
 *.joblib

@@ -1,0 +1,109 @@
+Infectious Diseases
+
+Ebola outbreak in Congo over, Congolese health officials and WHO say (Reuters, Dec 1, 2025) – An Ebola outbreak in the Democratic Republic of Congo (DRC) was declared over after 42 days without a new case. The outbreak, the first in DRC since 2022, had 64 confirmed cases and 45 deaths
+reuters.com
+. Region/Country: DRC; Primary topic: Ebola (viral hemorrhagic fever).
+
+Zimbabwe restricts gatherings, food vending as cholera cases spike (Reuters, Nov 24, 2023) – Zimbabwe saw a sharp rise in cholera cases, with weekly new infections tripling from 437 to 1,259, the biggest jump since February 2023
+reuters.com
+. By late November the country had recorded 8,787 cases and 155 deaths; authorities declared a state of emergency in Harare to contain the water-borne outbreak
+reuters.com
+. Region/Country: Zimbabwe; Primary topic: Cholera (bacterial diarrhoeal disease).
+
+Nigeria to ease lockdowns in three states over six-week period (Reuters, Apr 29, 2020) – Nigeria announced a phased lifting of COVID-19 lockdowns in Lagos, Abuja and Ogun states starting May 4, 2020
+reuters.com
+. The easing came even as cases were still climbing: the day before, Nigeria reported 195 new COVID-19 infections (nearly double the previous daily record), bringing its total to 1,532 confirmed cases and 44 deaths
+reuters.com
+. Region/Country: Nigeria; Primary topic: COVID-19 (pandemic respiratory disease).
+
+Tuberculosis rates fall for the first time since COVID-19 pandemic, WHO report (Reuters, Nov 12, 2025) – For the first time since the pandemic began, global tuberculosis incidence fell ~2% in 2024 compared to 2023
+reuters.com
+. WHO reported that about 1.23 million people died of TB in 2024 (a 29% drop from 2015), but warned that funding cuts risk reversing this progress
+reuters.com
+. Region/Country: Global; Primary topic: Tuberculosis (infectious disease).
+
+PAHO warns against vaccine hesitancy in Latin America amid rise in measles, yellow fever (Reuters, Apr 24, 2025) – The Pan American Health Organization alerted that vaccine reluctance is contributing to outbreaks of measles and yellow fever. By April 2025, countries in the Americas reported about 2,313 measles cases (3 deaths) – a tenfold increase over last year – and 189 yellow fever cases (74 deaths), leading Colombia to declare a health emergency
+reuters.com
+reuters.com
+. Region/Country: Latin America (Americas); Primary topic: Measles and yellow fever (vaccine-preventable diseases).
+
+Chronic Illnesses and Conditions
+
+More than 800 million adults have diabetes globally, many untreated, study suggests (Reuters, Nov 14, 2024) – A major Lancet study found roughly 828 million adults had diabetes in 2022, nearly twice previous estimates, and that ~59% of adults over 30 with diabetes were not receiving treatment
+reuters.com
+. The diabetes prevalence has doubled since 1990, driven mainly by rising cases in low- and middle-income countries
+reuters.com
+. Region/Country: Global; Primary topic: Diabetes (chronic metabolic disease).
+
+Obesity rates soaring globally in 'monumental social failure', study says (Reuters, Mar 4, 2025) – New research projects that over half of all adults and one-third of children worldwide could be overweight or obese by 2050, a “monumental failure” of public health policy
+reuters.com
+. Already more than 2.1 billion adults and 493 million young people are overweight or obese, with global rates more than doubling since 1980
+reuters.com
+. Region/Country: Global; Primary topic: Obesity (chronic condition).
+
+Growing cancer burden masks inequity among rich and poor nations – WHO (Reuters, Feb 1, 2024) – The WHO’s cancer research arm reported about 20 million new cancer cases and 9.7 million cancer deaths worldwide in 2022
+reuters.com
+. Outcomes vary starkly by country: for example, breast cancer survival is much higher in wealthier nations than in poorer ones where late diagnosis and poor access to treatment drive higher mortality
+reuters.com
+. Region/Country: Global; Primary topic: Cancer (chronic disease).
+
+Mental Health and Well-being
+
+U.N. warns of global mental health crisis due to COVID-19 pandemic (Reuters, May 14, 2020) – United Nations health experts warned that the COVID-19 pandemic’s social and economic shocks (isolation, unemployment, fear) are triggering a looming mental health crisis worldwide
+reuters.com
+. WHO officials said rates of anxiety, depression and other disorders are surging and urged governments to make mental health support a priority in the pandemic response
+reuters.com
+. Region/Country: Global; Primary topic: Mental health.
+
+China Health Commission to narrow gaps in mental health services (Reuters, Jan 2, 2025) – China’s National Health Commission announced a 2025–2027 plan to improve mental health services after noting rising mental illness, especially among youth
+reuters.com
+. Planned measures include a national mental health hotline, regional treatment centers, and requiring mental-health clinics in local hospitals, aiming to address longstanding gaps in care
+reuters.com
+. Region/Country: China; Primary topic: Mental health services.
+
+Public Health Crises and Pandemics
+
+World unprepared for another pandemic as WHO treaty talks push on (Reuters, May 31, 2024) – A leading health expert warned that the world remains “unprepared” for a COVID-like health crisis even as nations negotiate a new WHO pandemic treaty
+reuters.com
+. Nigeria’s health minister said countries hope not to face another pandemic unprepared, underscoring urgency on provisions to ensure equitable access to tests, vaccines and treatments for low-income countries
+reuters.com
+. Region/Country: Global; Primary topic: Pandemic preparedness.
+
+Aid cuts could leave more women dying in pregnancy and birth, UN says (Reuters, Apr 6, 2025) – UN agencies warned that reductions in international aid may reverse hard-won gains in maternal health. Between 2000 and 2023, global maternal deaths had fallen by ~40%, but still about 260,000 women died from pregnancy or childbirth complications in 2023 (roughly one every two minutes)
+reuters.com
+reuters.com
+. Cuts to maternal and reproductive health programs threaten to push mortality back up. Region/Country: Global; Primary topic: Maternal health.
+
+UN agency says 13.7 million people face severe hunger due to global aid cuts (Reuters, Oct 16, 2025) – The UN World Food Programme warned nearly 14 million people (in countries like Afghanistan, the DRC, Haiti, Somalia, South Sudan, Sudan, etc.) could face severe hunger because of slashed aid budgets
+reuters.com
+. WFP said funding cuts might push millions from “crisis” to “emergency” hunger levels, risking famine in the most vulnerable regions
+reuters.com
+. Region/Country: Global (focus on Africa/Middle East); Primary topic: Hunger/malnutrition.
+
+Gaza patients face a painful wait as hospitals sag under burden of cases (Reuters, Nov 12, 2025) – Gaza’s health system was overwhelmed by mass casualties from war: only about half of Gaza’s 36 hospitals were partially operational (many destroyed or lacking staff, supplies, fuel)
+reuters.com
+. Thousands of injured patients waited months for surgeries; doctors reported being able to operate on only ~100 urgent cases per day for a population of ~2 million, forcing impossible triage decisions and some patients dying while waiting
+reuters.com
+. Region/Country: Gaza (Palestine); Primary topic: Conflict-related injuries/health crisis.
+
+Environmental and Other Health Issues
+
+European heatwave caused 2,300 deaths, scientists estimate (Reuters, July 9, 2025) – A rapid analysis found that an extreme heatwave in late June 2025 led to about 2,300 heat-related deaths across 12 European cities
+reuters.com
+. Researchers estimate 1,500 of those deaths were attributable to climate change making the heatwave more severe, highlighting rising climate-driven health risks
+reuters.com
+. Region/Country: Europe; Primary topic: Heatwave (climate-related health impact).
+
+Balkan air pollution crisis threatens public health, EU membership goals (Reuters, Jan 23, 2025) – Western Balkan nations (e.g. Kosovo, Serbia, Bosnia) suffer dangerously high air pollution from coal power, old vehicles and heating, with major health impacts. Pollution-attributable death rates are extremely high (e.g. 114 per 100,000 in Bosnia vs. ~45 in Germany)
+reuters.com
+, and local doctors report lung cancer rates more than doubling over two years in some towns
+reuters.com
+. Poor air quality threatens both public health and EU accession prospects. Region/Country: Balkans (Kosovo, Serbia, Bosnia, N. Macedonia); Primary topic: Air pollution (environmental health).
+
+Opioid crisis cost U.S. nearly $1.5 trillion in 2020 – report (Reuters, Sept 28, 2022) – A U.S. congressional report found that the opioid addiction and overdose epidemic (worsened by the COVID-19 pandemic) cost nearly $1.47 trillion in 2020 alone
+reuters.com
+. Opioid-related deaths surged during the pandemic (fentanyl-driven overdoses), accounting for about 75% of the 107,000 drug overdose fatalities in 2021
+reuters.com
+. Region/Country: United States; Primary topic: Opioid epidemic (substance abuse crisis).
+
+Sources: Each entry above is based on reputable news coverage of health issues, with key facts cited from the original article
