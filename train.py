@@ -9,6 +9,10 @@ import glob
 import os
 import pickle
 import sys
+import matplotlib
+matplotlib.use('Agg') # Non-interactive backend
+import matplotlib.pyplot as plt
+from sklearn.decomposition import PCA
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -47,6 +51,35 @@ EMBEDDING_MODEL = "mistralai/devstral-2512"
 # Create directories if they don't exist
 MODELS_DIR.mkdir(exist_ok=True)
 DATA_DIR.mkdir(exist_ok=True)
+STATIC_DIR = BASE_DIR / 'static'
+STATIC_DIR.mkdir(exist_ok=True)
+
+
+def generate_cluster_plot(X, labels, output_path):
+    """Generate and save a 2D scatter plot of clusters"""
+    print(f"Generating cluster visualization to {output_path}...")
+    
+    # Reduce to 2D using PCA
+    pca = PCA(n_components=2)
+    X_2d = pca.fit_transform(X)
+    
+    plt.figure(figsize=(10, 8))
+    
+    # Create scatter plot
+    scatter = plt.scatter(X_2d[:, 0], X_2d[:, 1], c=labels, cmap='viridis', alpha=0.6)
+    
+    # Add legend
+    plt.colorbar(scatter, label='Cluster ID')
+    
+    plt.title('News Article Clusters (2D Projection)')
+    plt.xlabel('Principal Component 1')
+    plt.ylabel('Principal Component 2')
+    plt.grid(True, alpha=0.3)
+    
+    # Save plot
+    plt.savefig(output_path, dpi=300, bbox_inches='tight')
+    plt.close()
+    print("✓ Visualization saved")
 
 
 def load_news_data(csv_path='data/list.csv', text_folder='data/*.txt'):
@@ -206,7 +239,7 @@ def save_model(models_data, vectorizer, preprocessor, lsa_model=None, embedding_
     print(f"✓ Models saved to {MODEL_PATH}")
 
 
-def train_clustering_pipeline(n_clusters=8):
+def train_clustering_pipeline(n_clusters=5):
     """Complete training pipeline"""
     print("\n" + "="*70)
     print("NEWS ARTICLE CLUSTERING - TRAINING PIPELINE")
@@ -265,6 +298,10 @@ def train_clustering_pipeline(n_clusters=8):
         'keywords': kmeans_keywords,
         'labels': kmeans_labels
     }
+    
+    # Generate Visualization
+    plot_path = STATIC_DIR / 'cluster_plot.png'
+    generate_cluster_plot(X_features, kmeans_labels, plot_path)
 
     # Step 4b: Apply Hierarchical
     print(f"\n🎯 Applying Hierarchical clustering with {n_clusters} clusters...")
@@ -327,8 +364,8 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(description='Train news clustering model')
-    parser.add_argument('--clusters', type=int, default=8,
-                        help='Number of clusters (default: 8)')
+    parser.add_argument('--clusters', type=int, default=5,
+                        help='Number of clusters (default: 5)')
     args = parser.parse_args()
 
     success = train_clustering_pipeline(n_clusters=args.clusters)

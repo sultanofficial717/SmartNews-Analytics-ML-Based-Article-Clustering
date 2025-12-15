@@ -535,6 +535,83 @@ HTML_TEMPLATE = '''
             color: #4facfe;
             text-decoration: none;
         }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 2000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(5px);
+            overflow: auto;
+        }
+
+        .modal-content {
+            background: #16213e;
+            margin: 5% auto;
+            padding: 0;
+            border: 1px solid rgba(79, 172, 254, 0.3);
+            width: 90%;
+            max-width: 800px;
+            border-radius: 15px;
+            box-shadow: 0 0 50px rgba(0, 0, 0, 0.5);
+            animation: zoomIn 0.3s ease;
+        }
+
+        @keyframes zoomIn {
+            from { transform: scale(0.9); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+
+        .modal-header {
+            padding: 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-header h2 {
+            color: #4facfe;
+            font-size: 1.5rem;
+        }
+
+        .modal-body {
+            padding: 30px;
+            text-align: center;
+        }
+
+        .modal-body img {
+            max-width: 100%;
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            margin-bottom: 20px;
+        }
+
+        .modal-description {
+            text-align: left;
+            color: #ccc;
+            line-height: 1.6;
+            background: rgba(0, 0, 0, 0.2);
+            padding: 20px;
+            border-radius: 10px;
+        }
+
+        .close-modal {
+            color: #aaa;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: color 0.3s;
+        }
+
+        .close-modal:hover {
+            color: #fff;
+        }
     </style>
 </head>
 <body>
@@ -580,6 +657,9 @@ HTML_TEMPLATE = '''
                 </button>
                 <button id="clear-btn" class="btn btn-secondary">
                     <i class="fas fa-times"></i> Clear
+                </button>
+                <button id="details-btn" class="btn btn-tertiary" {{ 'disabled' if not model_loaded }}>
+                    <i class="fas fa-chart-pie"></i> Model Details
                 </button>
             </div>
 
@@ -642,6 +722,19 @@ HTML_TEMPLATE = '''
     <!-- Toast Notification -->
     <div id="toast" class="toast"></div>
 
+    <!-- Model Details Modal -->
+    <div id="details-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn">&times;</span>
+            <h2>Cluster Visualization</h2>
+            <p>This graph shows how the articles in the training set are grouped. We use PCA (Principal Component Analysis) to reduce the complex text data into 2 dimensions so we can plot it.</p>
+            <p>Each point represents an article. Points of the same color belong to the same cluster (topic).</p>
+            <div style="text-align: center; margin-top: 20px;">
+                <img src="{{ url_for('static', filename='cluster_plot.png') }}" alt="Cluster Visualization" style="max-width: 100%; border: 1px solid #ddd; border-radius: 4px;">
+            </div>
+        </div>
+    </div>
+
     <script>
         // Sample texts
         const sampleTexts = {
@@ -662,6 +755,29 @@ HTML_TEMPLATE = '''
         const closeResult = document.getElementById('close-result');
         const loading = document.getElementById('loading');
         const toast = document.getElementById('toast');
+
+        // Modal Logic
+        const modal = document.getElementById("details-modal");
+        const btn = document.getElementById("details-btn");
+        const span = document.getElementsByClassName("close-btn")[0];
+
+        if (btn) {
+            btn.onclick = function() {
+                modal.style.display = "block";
+            }
+        }
+
+        if (span) {
+            span.onclick = function() {
+                modal.style.display = "none";
+            }
+        }
+
+        window.onclick = function(event) {
+            if (event.target == modal) {
+                modal.style.display = "none";
+            }
+        }
 
         // Character counter
         articleInput.addEventListener('input', () => {
