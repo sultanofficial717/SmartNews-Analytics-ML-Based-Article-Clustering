@@ -165,7 +165,11 @@ def reduce_dimensions(X, n_components=100):
 
 
 def tune_lsa_kmeans(X_tfidf, max_components=50, max_clusters=10, fixed_n_clusters=None):
-    """Tune LSA components and K-Means clusters for best Silhouette Score"""
+    """Tune LSA components and K-Means clusters for best Silhouette Score
+    
+    Note: This function performs an exhaustive grid search over parameter combinations.
+    For large datasets, consider using random search or Bayesian optimization for better performance.
+    """
     print("\n[TUNING] Tuning LSA components and K-Means clusters...")
     best_score = -1
     best_params = {'n_components': 10, 'n_clusters': fixed_n_clusters if fixed_n_clusters else 5} 
@@ -208,7 +212,8 @@ def tune_lsa_kmeans(X_tfidf, max_components=50, max_clusters=10, fixed_n_cluster
                         best_score = score
                         best_params = {'n_components': n_comp, 'n_clusters': k}
                         print(f"  New best: Sil={score:.3f}, DB={db_score:.3f} (Components={n_comp}, Clusters={k})")
-                except:
+                except ValueError as e:
+                    # Silhouette score fails when all points are in one cluster or invalid clustering
                     pass
         except Exception as e:
             print(f"  Error during tuning with n_components={n_comp}: {e}")

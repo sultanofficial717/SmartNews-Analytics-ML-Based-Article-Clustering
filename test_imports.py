@@ -1,5 +1,3 @@
-
-import sys
 print("Starting test script")
 try:
     import pandas

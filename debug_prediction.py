@@ -1,7 +1,6 @@
 import sys
 import os
 import pickle
-import numpy as np
 from run_app import preprocess_text
 
 # Add current directory to path

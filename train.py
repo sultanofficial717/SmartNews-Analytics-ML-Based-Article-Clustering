@@ -2,7 +2,6 @@
 Model training script for news clustering
 Run this to train the model before starting the Flask app
 """
-print("DEBUG: Script starting...")
 
 import pandas as pd
 import numpy as np
@@ -268,8 +267,8 @@ def train_clustering_pipeline(n_clusters=5):
     # Pass the requested n_clusters to fix it during tuning
     best_params = tune_lsa_kmeans(X, max_components=50, max_clusters=10, fixed_n_clusters=n_clusters)
     n_components = best_params['n_components']
-    n_clusters = best_params['n_clusters']
-    print(f"[INFO] Using tuned parameters: n_components={n_components}, n_clusters={n_clusters}")
+    tuned_n_clusters = best_params['n_clusters']
+    print(f"[INFO] Using tuned parameters: n_components={n_components}, n_clusters={tuned_n_clusters}")
 
     # Step 3b: Apply LSA (Dimensionality Reduction)
     print(f"\n[LSA] Reducing dimensions to {n_components} components...")
@@ -281,8 +280,8 @@ def train_clustering_pipeline(n_clusters=5):
     models_data = {}
 
     # Step 4a: Apply K-Means
-    print(f"\n[CLUST] Applying K-Means clustering with {n_clusters} clusters...")
-    kmeans_labels, kmeans_model, kmeans_scores = apply_kmeans(X_clustering, n_clusters=n_clusters)
+    print(f"\n[CLUST] Applying K-Means clustering with {tuned_n_clusters} clusters...")
+    kmeans_labels, kmeans_model, kmeans_scores = apply_kmeans(X_clustering, n_clusters=tuned_n_clusters)
     kmeans_keywords = extract_top_keywords(X, feature_names, kmeans_labels, n_keywords=10)
     
     models_data['kmeans'] = {
