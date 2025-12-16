@@ -5,7 +5,7 @@ import string
 import nltk
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
-from nltk.stem import PorterStemmer
+from nltk.stem import WordNetLemmatizer
 
 # Download required NLTK data
 try:
@@ -18,11 +18,10 @@ try:
 except LookupError:
     nltk.download('stopwords')
 
-# WordNet not needed for PorterStemmer
-# try:
-#     nltk.data.find('corpora/wordnet')
-# except LookupError:
-#     nltk.download('wordnet')
+try:
+    nltk.data.find('corpora/wordnet')
+except LookupError:
+    nltk.download('wordnet')
 
 try:
     nltk.data.find('taggers/averaged_perceptron_tagger')
@@ -39,10 +38,17 @@ class TextPreprocessor:
     """Preprocess text for clustering"""
 
     def __init__(self):
-        self.stemmer = PorterStemmer()
+        self.lemmatizer = WordNetLemmatizer()
         self.stop_words = set(stopwords.words('english'))
         # Add common words that don't add meaning
-        self.stop_words.update(['said', 'would', 'could', 'also', 'may', 'might'])
+        self.stop_words.update([
+            'said', 'would', 'could', 'also', 'may', 'might', 'must',
+            'should', 'this', 'that', 'these', 'those', 'one', 'two',
+            'like', 'even', 'see', 'get', 'make', 'go', 'know', 'take',
+            'come', 'think', 'look', 'want', 'give', 'use', 'find',
+            'tell', 'ask', 'work', 'seem', 'feel', 'try', 'leave',
+            'call', 'new', 'year', 'time', 'day', 'people', 'way'
+        ])
 
     def clean_text(self, text):
         """Basic cleaning"""
@@ -67,28 +73,34 @@ class TextPreprocessor:
         return text
 
     def tokenize_and_lemmatize(self, text):
-        """Tokenize and stem text"""
-        # Tokenize
-        tokens = word_tokenize(text)
+        """Tokenize and lemmatize text"""
+        # Tokenize using simple regex to avoid NLTK hang
+        tokens = re.findall(r'\b\w+\b', text.lower())
 
-        # Remove stopwords and stem
-        stemmed = [
-            self.stemmer.stem(token)
+        # Remove stopwords and lemmatize
+        lemmatized = [
+            self.lemmatizer.lemmatize(token)
             for token in tokens
             if token not in self.stop_words and len(token) > 2
         ]
 
-        return ' '.join(stemmed)
+        return ' '.join(lemmatized)
 
     def preprocess(self, text):
         """Complete preprocessing pipeline"""
+        # print("  Cleaning...")
         text = self.clean_text(text)
+        # print("  Tokenizing...")
         text = self.tokenize_and_lemmatize(text)
+        # print("  Done.")
         return text
 
     def preprocess_documents(self, documents):
         """Preprocess multiple documents"""
         print("Preprocessing documents...")
-        processed = [self.preprocess(doc) for doc in documents]
+        processed = []
+        for i, doc in enumerate(documents):
+            print(f"  Processing document {i+1}/{len(documents)} (len={len(doc)})...")
+            processed.append(self.preprocess(doc))
         print("Preprocessing complete!")
         return processed

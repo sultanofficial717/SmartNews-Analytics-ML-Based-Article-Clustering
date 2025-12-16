@@ -8,8 +8,8 @@ from .clustering import (
     apply_dbscan,
     extract_top_keywords,
     compute_centroids,
-    reduce_dimensions
-    compute_centroids
+    reduce_dimensions,
+    tune_lsa_kmeans
 )
 from .predictor import NewsClusterPredictor
 from .embeddings import OpenRouterEmbeddingGenerator

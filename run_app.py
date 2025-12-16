@@ -36,13 +36,13 @@ def load_model():
             with open(MODEL_PATH, 'rb') as f:
                 predictor_data = pickle.load(f)
             model_loaded = True
-            print(f"✓ Model loaded successfully from {MODEL_PATH}")
+            print(f"[OK] Model loaded successfully from {MODEL_PATH}")
             return True
         else:
-            print(f"✗ Model file not found at {MODEL_PATH}")
+            print(f"[ERROR] Model file not found at {MODEL_PATH}")
             return False
     except Exception as e:
-        print(f"✗ Error loading model: {e}")
+        print(f"[ERROR] Error loading model: {e}")
         return False
 
 
@@ -64,43 +64,46 @@ def predict_cluster(text, model_type='kmeans'):
     
     try:
         # Preprocess the text
-        processed_text = preprocess_text(text)
+        if 'preprocessor' in predictor_data:
+            processed_text = predictor_data['preprocessor'].preprocess(text)
+        else:
+            # Fallback if preprocessor not found
+            processed_text = text.lower()
+            processed_text = re.sub(r'[^a-zA-Z\s]', '', processed_text)
+            processed_text = ' '.join(processed_text.split())
         
         # Get common components
         vectorizer = predictor_data['vectorizer']
+        lsa_model = predictor_data.get('lsa_model')
         
-        # Handle legacy model format
-        if 'models' not in predictor_data and 'model' in predictor_data:
-             model_data = {
-                 'model': predictor_data['model'],
-                 'keywords': predictor_data.get('cluster_keywords', {})
-             }
-             model_type = 'kmeans'
-        else:
-             if model_type not in models_data:
-                model_type = 'kmeans'
-             model_data = models_data[model_type]
-             
-        model = model_data['model']
-        keywords = model_data.get('keywords', {})
-        centroids = model_data.get('centroids')
+        # Transform text to vector
+        text_vector = vectorizer.transform([processed_text]).toarray()
         
-        # Get specific model data
+        # Apply LSA if available
+        if lsa_model:
+            text_vector = lsa_model.transform(text_vector)
+        
+        # Get models data
         models_data = predictor_data.get('models', {})
         
-        # Handle legacy model format if necessary
-        if 'models' not in predictor_data and 'model' in predictor_data:
-             # Fallback for old model format (only K-Means)
-             model_data = {
-                 'model': predictor_data['model'],
-                 'keywords': predictor_data.get('cluster_keywords', {})
+        # Handle legacy model format
+        if not models_data and 'model' in predictor_data:
+             models_data = {
+                 'kmeans': {
+                     'model': predictor_data['model'],
+                     'keywords': predictor_data.get('cluster_keywords', {})
+                 }
              }
-             model_type = 'kmeans' # Force kmeans
-        else:
-            if model_type not in models_data:
-                model_type = 'kmeans' # Default
-            model_data = models_data[model_type]
+        
+        if model_type not in models_data:
+            model_type = 'kmeans'
+            
+        if model_type not in models_data:
+             # If still not found (e.g. empty models_data), return error
+             return {'error': 'No models available'}
 
+        model_data = models_data[model_type]
+        
         cluster = -1
         confidence = 0.0
         keywords = []
@@ -149,6 +152,12 @@ def predict_cluster(text, model_type='kmeans'):
             'processed_text': processed_text[:200] + '...' if len(processed_text) > 200 else processed_text,
             'model_used': model_type
         }
+        
+    except Exception as e:
+        print(f"Error in prediction: {e}")
+        import traceback
+        traceback.print_exc()
+        return {'error': str(e)}
     except Exception as e:
         print(f"Prediction error: {e}")
         return None
@@ -161,9 +170,23 @@ HTML_TEMPLATE = '''
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>News Article Clustering - ML Project</title>
+    <title>SmartNews Analytics | ML Clustering</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --primary: #4361ee;
+            --secondary: #3f37c9;
+            --accent: #4895ef;
+            --background: #0f172a;
+            --surface: #1e293b;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --success: #10b981;
+            --error: #ef4444;
+            --border: #334155;
+        }
+
         * {
             margin: 0;
             padding: 0;
@@ -171,79 +194,197 @@ HTML_TEMPLATE = '''
         }
 
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
-            min-height: 100vh;
-            color: #fff;
+            font-family: 'Inter', sans-serif;
+            background-color: var(--background);
+            color: var(--text);
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
         }
 
-        .container {
-            max-width: 1000px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-
-        /* Header */
-        .header {
-            text-align: center;
-            padding: 40px 20px;
-            background: linear-gradient(135deg, rgba(79, 172, 254, 0.1), rgba(0, 242, 254, 0.1));
-            border-radius: 20px;
-            margin-bottom: 30px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-        }
-
-        .header h1 {
-            font-size: 2.5rem;
-            background: linear-gradient(135deg, #4facfe, #00f2fe);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            margin-bottom: 10px;
-        }
-
-        .header p {
-            color: #a0a0a0;
-            font-size: 1.1rem;
-        }
-
-        .status-badge {
-            display: inline-flex;
+        /* Navigation Bar */
+        .navbar {
+            height: 60px;
+            background-color: var(--surface);
+            border-bottom: 1px solid var(--border);
+            display: flex;
             align-items: center;
-            gap: 8px;
-            padding: 10px 20px;
-            border-radius: 25px;
-            font-size: 0.9rem;
-            margin-top: 20px;
+            padding: 0 20px;
+            justify-content: space-between;
+            z-index: 100;
         }
 
-        .status-badge.ready {
-            background: linear-gradient(135deg, #00b09b, #96c93d);
-            color: white;
-        }
-
-        .status-badge.error {
-            background: linear-gradient(135deg, #ff416c, #ff4b2b);
-            color: white;
-        }
-
-        /* Main Card */
-        .main-card {
-            background: rgba(255, 255, 255, 0.05);
-            backdrop-filter: blur(10px);
-            border-radius: 20px;
-            padding: 30px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            margin-bottom: 30px;
-        }
-
-        .section-title {
-            font-size: 1.4rem;
-            color: #4facfe;
-            margin-bottom: 20px;
+        .navbar-brand {
             display: flex;
             align-items: center;
             gap: 10px;
+            font-weight: 700;
+            font-size: 1.2rem;
+            color: var(--text);
+        }
+
+        .navbar-brand i {
+            color: var(--primary);
+            font-size: 1.4rem;
+        }
+
+        .navbar-actions {
+            display: flex;
+            gap: 15px;
+        }
+
+        .nav-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 1.1rem;
+            transition: color 0.2s;
+        }
+
+        .nav-btn:hover {
+            color: var(--text);
+        }
+
+        /* Main Layout */
+        .main-container {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 300px;
+            background-color: var(--surface);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            transition: transform 0.3s ease;
+            z-index: 90;
+        }
+
+        .sidebar.collapsed {
+            transform: translateX(-100%);
+            width: 0;
+            border: none;
+        }
+
+        .sidebar-header {
+            padding: 20px;
+            border-bottom: 1px solid var(--border);
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            font-size: 0.8rem;
+            letter-spacing: 1px;
+        }
+
+        .sidebar-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+        }
+
+        .metric-card {
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 15px;
+            border: 1px solid var(--border);
+        }
+
+        .metric-title {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-bottom: 5px;
+        }
+
+        .metric-value {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: var(--accent);
+        }
+
+        .metric-subtitle {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: 5px;
+        }
+
+        .plot-container {
+            margin-top: 20px;
+            border-radius: 10px;
+            overflow: hidden;
+            border: 1px solid var(--border);
+        }
+
+        .plot-container img {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+
+        /* Content Area */
+        .content {
+            flex: 1;
+            padding: 30px;
+            overflow-y: auto;
+            position: relative;
+        }
+
+        .toggle-sidebar-btn {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 50;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            color: var(--text);
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .toggle-sidebar-btn:hover {
+            background: var(--border);
+        }
+
+        .app-card {
+            max-width: 800px;
+            margin: 0 auto;
+            background: var(--surface);
+            border-radius: 16px;
+            border: 1px solid var(--border);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            overflow: hidden;
+        }
+
+        .card-header {
+            padding: 25px;
+            border-bottom: 1px solid var(--border);
+            background: linear-gradient(to right, rgba(67, 97, 238, 0.1), transparent);
+        }
+
+        .card-header h2 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .card-header p {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+        }
+
+        .card-body {
+            padding: 25px;
         }
 
         /* Form Elements */
@@ -251,698 +392,362 @@ HTML_TEMPLATE = '''
             margin-bottom: 20px;
         }
 
-        .form-group label {
+        .form-label {
             display: block;
-            margin-bottom: 10px;
-            color: #ccc;
-            font-size: 0.95rem;
+            margin-bottom: 8px;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            font-weight: 500;
         }
 
-        select {
+        .form-select, .form-textarea {
             width: 100%;
+            background: var(--background);
+            border: 1px solid var(--border);
+            border-radius: 8px;
             padding: 12px;
-            border-radius: 10px;
-            border: 2px solid rgba(255, 255, 255, 0.1);
-            background: rgba(0, 0, 0, 0.3);
-            color: #fff;
-            font-size: 1rem;
+            color: var(--text);
+            font-family: inherit;
+            font-size: 0.95rem;
+            transition: border-color 0.2s;
+        }
+
+        .form-select:focus, .form-textarea:focus {
             outline: none;
-            cursor: pointer;
+            border-color: var(--primary);
         }
 
-        select:focus {
-            border-color: #4facfe;
-        }
-
-        select option {
-            background: #16213e;
-            color: #fff;
-        }
-
-        textarea {
-            width: 100%;
-            padding: 15px;
-            border-radius: 12px;
-            border: 2px solid rgba(255, 255, 255, 0.1);
-            background: rgba(0, 0, 0, 0.3);
-            color: #fff;
-            font-size: 1rem;
-            resize: vertical;
+        .form-textarea {
             min-height: 150px;
-            transition: border-color 0.3s;
-        }
-
-        textarea:focus {
-            outline: none;
-            border-color: #4facfe;
-        }
-
-        textarea::placeholder {
-            color: #666;
-        }
-
-        .char-count {
-            text-align: right;
-            font-size: 0.85rem;
-            color: #666;
-            margin-top: 5px;
-        }
-
-        /* Buttons */
-        .button-group {
-            display: flex;
-            gap: 15px;
-            flex-wrap: wrap;
-            margin-top: 20px;
+            resize: vertical;
         }
 
         .btn {
-            padding: 12px 25px;
-            border-radius: 10px;
-            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-weight: 500;
             cursor: pointer;
-            font-size: 1rem;
+            transition: all 0.2s;
+            border: none;
             display: inline-flex;
             align-items: center;
             gap: 8px;
-            transition: all 0.3s;
-            font-weight: 500;
-        }
-
-        .btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
+            font-size: 0.95rem;
         }
 
         .btn-primary {
-            background: linear-gradient(135deg, #4facfe, #00f2fe);
-            color: #000;
+            background: var(--primary);
+            color: white;
         }
 
-        .btn-primary:hover:not(:disabled) {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 30px rgba(79, 172, 254, 0.4);
+        .btn-primary:hover {
+            background: var(--secondary);
         }
 
-        .btn-secondary {
-            background: rgba(255, 255, 255, 0.1);
-            color: #fff;
-            border: 1px solid rgba(255, 255, 255, 0.2);
+        .btn-outline {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text);
         }
 
-        .btn-secondary:hover:not(:disabled) {
-            background: rgba(255, 255, 255, 0.2);
+        .btn-outline:hover {
+            background: var(--border);
         }
 
-        .btn-tertiary {
-            background: linear-gradient(135deg, #f093fb, #f5576c);
-            color: #fff;
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
         }
 
-        .btn-tertiary:hover:not(:disabled) {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 30px rgba(240, 147, 251, 0.4);
-        }
-
-        /* Result Display */
-        .result-container {
+        /* Results */
+        .result-section {
             margin-top: 30px;
+            padding-top: 30px;
+            border-top: 1px solid var(--border);
             display: none;
         }
 
-        .result-container.show {
+        .result-section.show {
             display: block;
-            animation: fadeIn 0.5s ease;
+            animation: slideDown 0.4s ease;
         }
 
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(20px); }
+        @keyframes slideDown {
+            from { opacity: 0; transform: translateY(-10px); }
             to { opacity: 1; transform: translateY(0); }
         }
 
-        .result-card {
-            background: linear-gradient(135deg, rgba(79, 172, 254, 0.1), rgba(0, 242, 254, 0.1));
-            border-radius: 16px;
-            padding: 25px;
-            border: 1px solid rgba(79, 172, 254, 0.3);
-        }
-
-        .result-header {
-            display: flex;
-            justify-content: space-between;
+        .result-badge {
+            display: inline-flex;
             align-items: center;
-            margin-bottom: 20px;
-            padding-bottom: 15px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-        }
-
-        .result-header h3 {
-            color: #4facfe;
-            font-size: 1.2rem;
-        }
-
-        .close-btn {
-            background: none;
-            border: none;
-            color: #999;
-            cursor: pointer;
-            font-size: 1.2rem;
-            transition: color 0.3s;
-        }
-
-        .close-btn:hover {
-            color: #fff;
-        }
-
-        .cluster-display {
-            display: flex;
-            align-items: center;
-            gap: 20px;
-            margin-bottom: 25px;
-        }
-
-        .cluster-badge {
-            width: 80px;
-            height: 80px;
-            border-radius: 50%;
-            background: linear-gradient(135deg, #4facfe, #00f2fe);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 2rem;
-            font-weight: bold;
-            color: #000;
-            box-shadow: 0 10px 30px rgba(79, 172, 254, 0.4);
-        }
-
-        .cluster-info h4 {
-            color: #fff;
-            font-size: 1.1rem;
-            margin-bottom: 5px;
-        }
-
-        .cluster-info p {
-            color: #a0a0a0;
-        }
-
-        .keywords-section {
-            margin-top: 20px;
-        }
-
-        .keywords-section h4 {
-            color: #ccc;
-            font-size: 0.95rem;
-            margin-bottom: 12px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .keywords-list {
-            display: flex;
-            flex-wrap: wrap;
             gap: 10px;
-        }
-
-        .keyword-tag {
-            background: rgba(79, 172, 254, 0.2);
-            color: #4facfe;
-            padding: 6px 14px;
-            border-radius: 20px;
-            font-size: 0.85rem;
-            border: 1px solid rgba(79, 172, 254, 0.3);
-        }
-
-        .preview-section {
-            margin-top: 20px;
-            padding: 15px;
-            background: rgba(0, 0, 0, 0.2);
-            border-radius: 10px;
-        }
-
-        .preview-section h4 {
-            color: #ccc;
-            font-size: 0.9rem;
-            margin-bottom: 10px;
-        }
-
-        .preview-section p {
-            color: #999;
-            font-size: 0.9rem;
-            line-height: 1.5;
-        }
-
-        /* Toast Notification */
-        .toast {
-            position: fixed;
-            bottom: 30px;
-            right: 30px;
-            padding: 15px 25px;
-            border-radius: 10px;
-            color: white;
-            font-weight: 500;
-            z-index: 1000;
-            opacity: 0;
-            transform: translateY(20px);
-            transition: all 0.3s;
-        }
-
-        .toast.show {
-            opacity: 1;
-            transform: translateY(0);
-        }
-
-        .toast.success {
-            background: linear-gradient(135deg, #00b09b, #96c93d);
-        }
-
-        .toast.error {
-            background: linear-gradient(135deg, #ff416c, #ff4b2b);
-        }
-
-        /* Loading Spinner */
-        .loading {
-            display: none;
-            text-align: center;
-            padding: 30px;
-        }
-
-        .loading.show {
-            display: block;
-        }
-
-        .spinner {
-            width: 50px;
-            height: 50px;
-            border: 4px solid rgba(79, 172, 254, 0.2);
-            border-top-color: #4facfe;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-            margin: 0 auto 15px;
-        }
-
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-
-        /* Sample Texts */
-        .sample-section {
-            margin-top: 20px;
-            padding: 20px;
-            background: rgba(0, 0, 0, 0.2);
-            border-radius: 12px;
-        }
-
-        .sample-section h4 {
-            color: #ccc;
-            margin-bottom: 15px;
-            font-size: 0.95rem;
-        }
-
-        .sample-buttons {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-        }
-
-        .sample-btn {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--success);
             padding: 8px 16px;
-            border-radius: 8px;
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            background: rgba(255, 255, 255, 0.05);
-            color: #ccc;
-            cursor: pointer;
-            font-size: 0.85rem;
-            transition: all 0.3s;
+            border-radius: 20px;
+            font-weight: 600;
+            margin-bottom: 15px;
         }
 
-        .sample-btn:hover {
-            background: rgba(79, 172, 254, 0.2);
-            border-color: #4facfe;
-            color: #4facfe;
-        }
-
-        /* Footer */
-        .footer {
-            text-align: center;
-            padding: 30px;
-            color: #666;
-            font-size: 0.9rem;
-        }
-
-        .footer a {
-            color: #4facfe;
-            text-decoration: none;
-        }
-
-        /* Modal */
-        .modal {
-            display: none;
-            position: fixed;
-            z-index: 2000;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.8);
-            backdrop-filter: blur(5px);
-            overflow: auto;
-        }
-
-        .modal-content {
-            background: #16213e;
-            margin: 5% auto;
-            padding: 0;
-            border: 1px solid rgba(79, 172, 254, 0.3);
-            width: 90%;
-            max-width: 800px;
-            border-radius: 15px;
-            box-shadow: 0 0 50px rgba(0, 0, 0, 0.5);
-            animation: zoomIn 0.3s ease;
-        }
-
-        @keyframes zoomIn {
-            from { transform: scale(0.9); opacity: 0; }
-            to { transform: scale(1); opacity: 1; }
-        }
-
-        .modal-header {
-            padding: 20px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        .keywords-container {
             display: flex;
-            justify-content: space-between;
-            align-items: center;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 10px;
         }
 
-        .modal-header h2 {
-            color: #4facfe;
-            font-size: 1.5rem;
+        .keyword-chip {
+            background: rgba(67, 97, 238, 0.1);
+            color: var(--accent);
+            padding: 6px 12px;
+            border-radius: 16px;
+            font-size: 0.85rem;
+            border: 1px solid rgba(67, 97, 238, 0.2);
         }
 
-        .modal-body {
-            padding: 30px;
-            text-align: center;
+        /* Sample Pills */
+        .sample-pills {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-top: 10px;
         }
 
-        .modal-body img {
-            max-width: 100%;
-            border-radius: 10px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            margin-bottom: 20px;
-        }
-
-        .modal-description {
-            text-align: left;
-            color: #ccc;
-            line-height: 1.6;
-            background: rgba(0, 0, 0, 0.2);
-            padding: 20px;
-            border-radius: 10px;
-        }
-
-        .close-modal {
-            color: #aaa;
-            font-size: 28px;
-            font-weight: bold;
+        .sample-pill {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            padding: 6px 12px;
+            border-radius: 16px;
+            font-size: 0.8rem;
             cursor: pointer;
-            transition: color 0.3s;
+            transition: all 0.2s;
         }
 
-        .close-modal:hover {
-            color: #fff;
+        .sample-pill:hover {
+            background: var(--border);
+            color: var(--text);
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--background);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--text-muted);
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <!-- Header -->
-        <div class="header">
-            <h1><i class="fas fa-brain"></i> News Article Clustering</h1>
-            <p>Intelligent text classification using K-Means Machine Learning</p>
-            <div id="status-badge" class="status-badge {{ 'ready' if model_loaded else 'error' }}">
-                {% if model_loaded %}
-                <i class="fas fa-check-circle"></i> Model Ready
+    <!-- Navbar -->
+    <nav class="navbar">
+        <div class="navbar-brand">
+            <i class="fas fa-layer-group"></i>
+            <span>SmartNews Analytics</span>
+        </div>
+        <div class="navbar-actions">
+            <button class="nav-btn" title="Settings"><i class="fas fa-cog"></i></button>
+            <button class="nav-btn" title="Help"><i class="fas fa-question-circle"></i></button>
+            <button class="nav-btn" title="GitHub"><i class="fab fa-github"></i></button>
+        </div>
+    </nav>
+
+    <div class="main-container">
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <i class="fas fa-chart-line"></i> Model Performance
+            </div>
+            <div class="sidebar-content">
+                {% if scores %}
+                    {% for model_name, model_scores in scores.items() %}
+                    <div class="metric-card">
+                        <div class="metric-title">{{ model_name|upper }} Model</div>
+                        {% if model_scores.silhouette %}
+                        <div class="metric-value">{{ "%.3f"|format(model_scores.silhouette) }}</div>
+                        <div class="metric-subtitle">Silhouette Score</div>
+                        {% endif %}
+                        {% if model_scores.davies_bouldin %}
+                        <div style="margin-top: 10px;">
+                            <div class="metric-value" style="color: #f59e0b;">{{ "%.3f"|format(model_scores.davies_bouldin) }}</div>
+                            <div class="metric-subtitle">Davies-Bouldin Score</div>
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
                 {% else %}
-                <i class="fas fa-exclamation-circle"></i> Model Not Loaded
+                    <div class="metric-card">
+                        <div class="metric-subtitle">No performance data available. Please train the model.</div>
+                    </div>
                 {% endif %}
-            </div>
-        </div>
 
-        <!-- Main Prediction Card -->
-        <div class="main-card">
-            <h2 class="section-title"><i class="fas fa-magic"></i> Predict Article Cluster</h2>
-            
-            <div class="form-group">
-                <label for="model-select">Select Clustering Model</label>
-                <select id="model-select">
-                    <option value="kmeans">K-Means (Default)</option>
-                    <option value="hierarchical">Hierarchical Clustering</option>
-                    <option value="dbscan">DBSCAN</option>
-                </select>
-            </div>
-
-            <div class="form-group">
-                <label for="article-input">Enter News Article Text</label>
-                <textarea 
-                    id="article-input" 
-                    placeholder="Paste your news article here... (minimum 10 characters)"
-                    rows="6"></textarea>
-                <div class="char-count"><span id="char-counter">0</span> / 5000 characters</div>
-            </div>
-
-            <div class="button-group">
-                <button id="predict-btn" class="btn btn-primary" {{ 'disabled' if not model_loaded }}>
-                    <i class="fas fa-paper-plane"></i> Predict Cluster
-                </button>
-                <button id="clear-btn" class="btn btn-secondary">
-                    <i class="fas fa-times"></i> Clear
-                </button>
-                <button id="details-btn" class="btn btn-tertiary" {{ 'disabled' if not model_loaded }}>
-                    <i class="fas fa-chart-pie"></i> Model Details
-                </button>
-            </div>
-
-            <!-- Sample Texts -->
-            <div class="sample-section">
-                <h4><i class="fas fa-star"></i> Try Sample Texts</h4>
-                <div class="sample-buttons">
-                    <button class="sample-btn" data-sample="tech">Technology</button>
-                    <button class="sample-btn" data-sample="sports">Sports</button>
-                    <button class="sample-btn" data-sample="science">Science</button>
-                    <button class="sample-btn" data-sample="politics">Politics</button>
-                    <button class="sample-btn" data-sample="space">Space</button>
+                <div class="sidebar-header" style="margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border);">
+                    <i class="fas fa-project-diagram"></i> Cluster Visualization
+                </div>
+                <div class="plot-container">
+                    <img src="{{ url_for('static', filename='cluster_plot.png') }}" alt="Cluster Plot" onerror="this.style.display='none'">
                 </div>
             </div>
+        </aside>
 
-            <!-- Loading Spinner -->
-            <div id="loading" class="loading">
-                <div class="spinner"></div>
-                <p>Analyzing text...</p>
-            </div>
+        <!-- Main Content -->
+        <main class="content">
+            <button class="toggle-sidebar-btn" id="toggleSidebar">
+                <i class="fas fa-bars"></i>
+            </button>
 
-            <!-- Result Display -->
-            <div id="result-container" class="result-container">
-                <div class="result-card">
-                    <div class="result-header">
-                        <h3><i class="fas fa-check-circle"></i> Prediction Result</h3>
-                        <button id="close-result" class="close-btn"><i class="fas fa-times"></i></button>
+            <div class="app-card">
+                <div class="card-header">
+                    <h2>Article Classifier</h2>
+                    <p>Paste a news article below to automatically categorize it using our ML models.</p>
+                </div>
+                <div class="card-body">
+                    <div class="form-group">
+                        <label class="form-label">Select Model</label>
+                        <select id="model-select" class="form-select">
+                            <option value="kmeans">K-Means Clustering (Recommended)</option>
+                            <option value="hierarchical">Hierarchical Clustering</option>
+                            <option value="dbscan">DBSCAN</option>
+                        </select>
                     </div>
-                    
-                    <div class="cluster-display">
-                        <div class="cluster-badge">
-                            <span id="cluster-number">0</span>
-                        </div>
-                        <div class="cluster-info">
-                            <h4>Predicted Cluster</h4>
-                            <p id="cluster-label">Category identified</p>
-                            <p id="confidence-score" style="color: #4facfe; font-size: 0.9rem; margin-top: 5px;">Confidence: 0%</p>
+
+                    <div class="form-group">
+                        <label class="form-label">Article Text</label>
+                        <textarea id="article-input" class="form-textarea" placeholder="Paste the full text of the news article here..."></textarea>
+                        <div class="sample-pills">
+                            <span class="sample-pill" data-type="tech">Technology</span>
+                            <span class="sample-pill" data-type="sports">Sports</span>
+                            <span class="sample-pill" data-type="politics">Politics</span>
+                            <span class="sample-pill" data-type="medical">Medical</span>
                         </div>
                     </div>
 
-                    <div class="keywords-section">
-                        <h4><i class="fas fa-tags"></i> Cluster Keywords</h4>
-                        <div id="keywords-list" class="keywords-list"></div>
+                    <div class="btn-group">
+                        <button id="predict-btn" class="btn btn-primary">
+                            <i class="fas fa-magic"></i> Analyze Article
+                        </button>
+                        <button id="clear-btn" class="btn btn-outline">
+                            <i class="fas fa-eraser"></i> Clear
+                        </button>
                     </div>
 
-                    <div class="preview-section">
-                        <h4><i class="fas fa-eye"></i> Processed Text Preview</h4>
-                        <p id="text-preview"></p>
+                    <!-- Results -->
+                    <div id="result-section" class="result-section">
+                        <div class="result-badge">
+                            <i class="fas fa-check-circle"></i>
+                            <span id="cluster-result">Cluster 0</span>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">Confidence Score</label>
+                            <div style="background: var(--background); height: 8px; border-radius: 4px; overflow: hidden;">
+                                <div id="confidence-bar" style="width: 0%; height: 100%; background: var(--success); transition: width 1s ease;"></div>
+                            </div>
+                            <div id="confidence-text" style="text-align: right; font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;">0%</div>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">Top Keywords</label>
+                            <div id="keywords-container" class="keywords-container">
+                                <!-- Keywords will be injected here -->
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
-
-        <!-- Footer -->
-        <div class="footer">
-            <p>News Article Clustering ML Project | Built with Flask & scikit-learn</p>
-        </div>
-    </div>
-
-    <!-- Toast Notification -->
-    <div id="toast" class="toast"></div>
-
-    <!-- Model Details Modal -->
-    <div id="details-modal" class="modal">
-        <div class="modal-content">
-            <span class="close-btn">&times;</span>
-            <h2>Cluster Visualization</h2>
-            <p>This graph shows how the articles in the training set are grouped. We use PCA (Principal Component Analysis) to reduce the complex text data into 2 dimensions so we can plot it.</p>
-            <p>Each point represents an article. Points of the same color belong to the same cluster (topic).</p>
-            <div style="text-align: center; margin-top: 20px;">
-                <img src="{{ url_for('static', filename='cluster_plot.png') }}" alt="Cluster Visualization" style="max-width: 100%; border: 1px solid #ddd; border-radius: 4px;">
-            </div>
-        </div>
+        </main>
     </div>
 
     <script>
-        // Sample texts
-        const sampleTexts = {
-            tech: "The new graphics card features advanced ray tracing technology with improved performance. Computer hardware companies are pushing the boundaries of processing power and memory bandwidth. Software developers are optimizing their applications to take advantage of these technological improvements.",
-            sports: "The hockey team won the championship in an exciting overtime match. Baseball players are preparing for the upcoming season with intensive training camps. The motorsports racing event attracted thousands of fans to watch their favorite auto racers compete for the trophy.",
-            science: "Scientists have discovered a new treatment that could revolutionize medicine and healthcare. The medical research team published their findings in a peer-reviewed journal. Electronic devices are becoming more sophisticated with miniaturized circuits and improved battery technology.",
-            politics: "The government announced new policies regarding gun control and firearm regulations. Political discussions continue about security measures and law enforcement. Representatives from different parties debated the proposed legislation in congress.",
-            space: "NASA launched a new spacecraft to explore distant planets and gather scientific data. The space program continues to advance our understanding of the universe. Astronomers discovered new celestial objects using advanced telescope technology."
+        // Sidebar Toggle
+        const sidebar = document.getElementById('sidebar');
+        const toggleBtn = document.getElementById('toggleSidebar');
+        
+        toggleBtn.addEventListener('click', () => {
+            sidebar.classList.toggle('collapsed');
+        });
+
+        // Sample Texts
+        const samples = {
+            tech: "The new quantum processor achieves breakthrough speeds in computing tasks. Researchers demonstrated quantum supremacy by solving complex problems in seconds.",
+            sports: "The championship game ended in a dramatic overtime victory. The team's defense was impenetrable, leading them to lift the trophy after a grueling season.",
+            politics: "The senate passed the new bill with a majority vote today. Lawmakers debated for hours regarding the implications of the new tax reform legislation.",
+            medical: "Clinical trials show promising results for the new vaccine. Doctors are optimistic about the treatment's efficacy in preventing the spread of the virus."
         };
 
-        // DOM Elements
-        const articleInput = document.getElementById('article-input');
-        const modelSelect = document.getElementById('model-select');
-        const charCounter = document.getElementById('char-counter');
-        const predictBtn = document.getElementById('predict-btn');
-        const clearBtn = document.getElementById('clear-btn');
-        const resultContainer = document.getElementById('result-container');
-        const closeResult = document.getElementById('close-result');
-        const loading = document.getElementById('loading');
-        const toast = document.getElementById('toast');
-
-        // Modal Logic
-        const modal = document.getElementById("details-modal");
-        const btn = document.getElementById("details-btn");
-        const span = document.getElementsByClassName("close-btn")[0];
-
-        if (btn) {
-            btn.onclick = function() {
-                modal.style.display = "block";
-            }
-        }
-
-        if (span) {
-            span.onclick = function() {
-                modal.style.display = "none";
-            }
-        }
-
-        window.onclick = function(event) {
-            if (event.target == modal) {
-                modal.style.display = "none";
-            }
-        }
-
-        // Character counter
-        articleInput.addEventListener('input', () => {
-            const count = articleInput.value.length;
-            charCounter.textContent = count;
-            predictBtn.disabled = count < 10 || !{{ 'true' if model_loaded else 'false' }};
-        });
-
-        // Clear button
-        clearBtn.addEventListener('click', () => {
-            articleInput.value = '';
-            charCounter.textContent = '0';
-            resultContainer.classList.remove('show');
-            predictBtn.disabled = true;
-        });
-
-        // Close result
-        closeResult.addEventListener('click', () => {
-            resultContainer.classList.remove('show');
-        });
-
-        // Sample text buttons
-        document.querySelectorAll('.sample-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const sampleType = btn.dataset.sample;
-                articleInput.value = sampleTexts[sampleType];
-                charCounter.textContent = articleInput.value.length;
-                predictBtn.disabled = false;
+        document.querySelectorAll('.sample-pill').forEach(pill => {
+            pill.addEventListener('click', () => {
+                document.getElementById('article-input').value = samples[pill.dataset.type];
             });
         });
 
-        // Show toast notification
-        function showToast(message, type = 'success') {
-            toast.textContent = message;
-            toast.className = `toast ${type} show`;
-            setTimeout(() => {
-                toast.classList.remove('show');
-            }, 3000);
-        }
+        // Clear
+        document.getElementById('clear-btn').addEventListener('click', () => {
+            document.getElementById('article-input').value = '';
+            document.getElementById('result-section').classList.remove('show');
+        });
 
-        // Predict button
-        predictBtn.addEventListener('click', async () => {
-            const text = articleInput.value.trim();
-            const modelType = modelSelect.value;
-            
+        // Predict
+        document.getElementById('predict-btn').addEventListener('click', async () => {
+            const text = document.getElementById('article-input').value;
+            const model = document.getElementById('model-select').value;
+            const btn = document.getElementById('predict-btn');
+
             if (text.length < 10) {
-                showToast('Text is too short (minimum 10 characters)', 'error');
+                alert('Please enter at least 10 characters.');
                 return;
             }
 
-            // Show loading
-            loading.classList.add('show');
-            resultContainer.classList.remove('show');
-            predictBtn.disabled = true;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Analyzing...';
 
             try {
                 const response = await fetch('/api/predict', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ text, model_type: modelType })
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ text: text, model_type: model })
                 });
 
                 const data = await response.json();
 
-                if (response.ok && data.cluster !== undefined) {
-                    // Display result
-                    document.getElementById('cluster-number').textContent = data.cluster;
-                    document.getElementById('cluster-label').textContent = `Cluster ${data.cluster} - Topic Category`;
-                    
-                    // Display confidence
-                    const confidencePercent = (data.confidence * 100).toFixed(1);
-                    document.getElementById('confidence-score').textContent = `Confidence: ${confidencePercent}%`;
-                    
-                    document.getElementById('text-preview').textContent = data.processed_text || text.substring(0, 200) + '...';
-                    
-                    // Display keywords
-                    const keywordsList = document.getElementById('keywords-list');
-                    keywordsList.innerHTML = '';
-                    
-                    if (data.keywords && data.keywords.length > 0) {
-                        data.keywords.forEach(keyword => {
-                            const tag = document.createElement('span');
-                            tag.className = 'keyword-tag';
-                            tag.textContent = keyword;
-                            keywordsList.appendChild(tag);
-                        });
-                    } else {
-                        keywordsList.innerHTML = '<span class="keyword-tag">No keywords available</span>';
-                    }
-
-                    resultContainer.classList.add('show');
-                    showToast('Prediction successful!', 'success');
+                if (data.error) {
+                    alert(data.error);
                 } else {
-                    showToast(data.error || 'Prediction failed', 'error');
-                    if (data.message) {
-                        console.log(data.message);
-                    }
+                    // Update UI
+                    document.getElementById('cluster-result').textContent = `Cluster ${data.cluster}`;
+                    
+                    const confidence = (data.confidence * 100).toFixed(1);
+                    document.getElementById('confidence-bar').style.width = `${confidence}%`;
+                    document.getElementById('confidence-text').textContent = `${confidence}%`;
+
+                    const keywordsContainer = document.getElementById('keywords-container');
+                    keywordsContainer.innerHTML = '';
+                    data.keywords.forEach(kw => {
+                        const chip = document.createElement('span');
+                        chip.className = 'keyword-chip';
+                        chip.textContent = kw;
+                        keywordsContainer.appendChild(chip);
+                    });
+
+                    document.getElementById('result-section').classList.add('show');
                 }
-            } catch (error) {
-                console.error('Error:', error);
-                showToast('Connection error. Please try again.', 'error');
+            } catch (e) {
+                console.error(e);
+                alert('An error occurred.');
             } finally {
-                loading.classList.remove('show');
-                predictBtn.disabled = articleInput.value.length < 10;
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-magic"></i> Analyze Article';
             }
         });
     </script>
@@ -954,7 +759,13 @@ HTML_TEMPLATE = '''
 @app.route('/')
 def home():
     """Home page"""
-    return render_template_string(HTML_TEMPLATE, model_loaded=model_loaded)
+    scores = {}
+    if predictor_data and 'models' in predictor_data:
+        for model_name, model_info in predictor_data['models'].items():
+            if 'scores' in model_info:
+                scores[model_name] = model_info['scores']
+    
+    return render_template_string(HTML_TEMPLATE, model_loaded=model_loaded, scores=scores)
 
 
 @app.route('/api/status')
@@ -1023,10 +834,10 @@ if __name__ == '__main__':
     load_model()
     
     if model_loaded:
-        print("\n✓ Model loaded successfully!")
-        print("✓ Application is ready to accept predictions")
+        print("\n[OK] Model loaded successfully!")
+        print("[OK] Application is ready to accept predictions")
     else:
-        print("\n⚠ Model not found. Please train the model first.")
+        print("\n[WARN] Model not found. Please train the model first.")
         print("  Run: python train.py")
     
     print("\n" + "-"*60)

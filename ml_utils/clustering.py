@@ -16,7 +16,8 @@ def extract_tfidf_features(documents, max_features=1000, ngram_range=(1, 2)):
     # Adjust parameters for small datasets
     n_docs = len(documents)
     min_df = 2 if n_docs >= 5 else 1
-    max_df = 0.8 if n_docs >= 5 else 1.0
+    # Lower max_df to remove more common words that might blur clusters
+    max_df = 0.5 if n_docs >= 5 else 1.0
 
     vectorizer = TfidfVectorizer(
         max_features=max_features,
@@ -49,9 +50,11 @@ def compute_centroids(X, labels):
 def apply_kmeans(X, n_clusters=5):
     """Apply K-Means clustering"""
     print(f"\nApplying K-Means with {n_clusters} clusters...")
-    kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
+    # Increased n_init for better convergence
+    kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init=30)
     labels = kmeans.fit_predict(X)
 
+    scores = {}
     # Calculate metrics
     if 2 <= n_clusters < X.shape[0]:
         try:
@@ -59,12 +62,13 @@ def apply_kmeans(X, n_clusters=5):
             davies_bouldin = davies_bouldin_score(X, labels)
             print(f"Silhouette Score: {silhouette:.3f}")
             print(f"Davies-Bouldin Score: {davies_bouldin:.3f}")
+            scores = {'silhouette': silhouette, 'davies_bouldin': davies_bouldin}
         except Exception as e:
             print(f"Could not calculate metrics: {e}")
     else:
         print(f"Skipping metrics calculation (n_clusters={n_clusters}, n_samples={X.shape[0]})")
 
-    return labels, kmeans
+    return labels, kmeans, scores
 
 
 def apply_hierarchical(X, n_clusters=5):
@@ -73,6 +77,7 @@ def apply_hierarchical(X, n_clusters=5):
     hierarchical = AgglomerativeClustering(n_clusters=n_clusters)
     labels = hierarchical.fit_predict(X)
 
+    scores = {}
     # Calculate metrics
     if 2 <= n_clusters < X.shape[0]:
         try:
@@ -80,12 +85,13 @@ def apply_hierarchical(X, n_clusters=5):
             davies_bouldin = davies_bouldin_score(X, labels)
             print(f"Silhouette Score: {silhouette:.3f}")
             print(f"Davies-Bouldin Score: {davies_bouldin:.3f}")
+            scores = {'silhouette': silhouette, 'davies_bouldin': davies_bouldin}
         except Exception as e:
             print(f"Could not calculate metrics: {e}")
     else:
         print(f"Skipping metrics calculation (n_clusters={n_clusters}, n_samples={X.shape[0]})")
 
-    return labels, hierarchical
+    return labels, hierarchical, scores
 
 
 def apply_dbscan(X, eps=0.5, min_samples=5):
@@ -100,14 +106,16 @@ def apply_dbscan(X, eps=0.5, min_samples=5):
     print(f"Number of clusters: {n_clusters}")
     print(f"Number of noise points: {n_noise}")
 
+    scores = {}
     if n_clusters > 1 and n_clusters < X.shape[0]:
         try:
             silhouette = silhouette_score(X[labels != -1], labels[labels != -1])
             print(f"Silhouette Score: {silhouette:.3f}")
+            scores = {'silhouette': silhouette}
         except Exception as e:
             print(f"Could not calculate metrics: {e}")
 
-    return labels, dbscan
+    return labels, dbscan, scores
 
 
 def extract_top_keywords(X, feature_names, labels, n_keywords=10):
@@ -137,3 +145,73 @@ def extract_top_keywords(X, feature_names, labels, n_keywords=10):
         print(f"Keywords: {', '.join(top_keywords)}")
 
     return cluster_keywords
+
+
+def reduce_dimensions(X, n_components=100):
+    """Reduce dimensions using LSA (TruncatedSVD)"""
+    # Adjust n_components if dataset is small
+    n_components = min(n_components, X.shape[1] - 1, X.shape[0] - 1)
+    if n_components < 2:
+        n_components = 2
+        
+    print(f"Reducing dimensions to {n_components} components...")
+    lsa = make_pipeline(TruncatedSVD(n_components=n_components, random_state=42), Normalizer(copy=False))
+    X_lsa = lsa.fit_transform(X)
+    
+    explained_variance = lsa.steps[0][1].explained_variance_ratio_.sum()
+    print(f"Explained variance: {explained_variance:.2%}")
+    
+    return X_lsa, lsa
+
+
+def tune_lsa_kmeans(X_tfidf, max_components=50, max_clusters=10, fixed_n_clusters=None):
+    """Tune LSA components and K-Means clusters for best Silhouette Score"""
+    print("\n[TUNING] Tuning LSA components and K-Means clusters...")
+    best_score = -1
+    best_params = {'n_components': 10, 'n_clusters': fixed_n_clusters if fixed_n_clusters else 5} 
+    
+    # Try different n_components
+    # For small dataset (124 docs), components should be small
+    component_options = [2, 3, 4, 5, 10, 15, 20, 30, 40, 50]
+    component_range = [n for n in component_options if n < X_tfidf.shape[0] and n < X_tfidf.shape[1]]
+    
+    if not component_range:
+        component_range = [min(X_tfidf.shape[0]-1, X_tfidf.shape[1]-1, 5)]
+
+    # Determine cluster range
+    if fixed_n_clusters:
+        cluster_range = [fixed_n_clusters]
+        print(f"[TUNING] Fixed number of clusters: {fixed_n_clusters}")
+    else:
+        cluster_range = range(2, max_clusters + 1)
+
+    for n_comp in component_range:
+        # Apply LSA
+        try:
+            lsa = make_pipeline(TruncatedSVD(n_components=n_comp, random_state=42), Normalizer(copy=False))
+            X_lsa = lsa.fit_transform(X_tfidf)
+            
+            # Try different n_clusters
+            for k in cluster_range:
+                if k >= X_lsa.shape[0]:
+                    continue
+                    
+                kmeans = KMeans(n_clusters=k, random_state=42, n_init=30)
+                labels = kmeans.fit_predict(X_lsa)
+                
+                try:
+                    score = silhouette_score(X_lsa, labels)
+                    db_score = davies_bouldin_score(X_lsa, labels)
+                    
+                    # Prefer fewer clusters if scores are similar (Occam's razor)
+                    if score > best_score:
+                        best_score = score
+                        best_params = {'n_components': n_comp, 'n_clusters': k}
+                        print(f"  New best: Sil={score:.3f}, DB={db_score:.3f} (Components={n_comp}, Clusters={k})")
+                except:
+                    pass
+        except Exception as e:
+            print(f"  Error during tuning with n_components={n_comp}: {e}")
+                
+    print(f"[TUNING] Best parameters found: {best_params} with Silhouette Score: {best_score:.3f}")
+    return best_params
