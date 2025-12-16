@@ -137,3 +137,24 @@ def extract_top_keywords(X, feature_names, labels, n_keywords=10):
         print(f"Keywords: {', '.join(top_keywords)}")
 
     return cluster_keywords
+
+
+def reduce_dimensions(X, n_components=2, random_state=42):
+    """Reduce dimensionality of feature matrix using TruncatedSVD + Normalizer.
+    
+    Returns the reduced array and the fitted pipeline.
+    """
+    print(f"Reducing dimensions to {n_components} components...")
+
+    # If requested components >= original features, return original data
+    if n_components >= X.shape[1]:
+        print("Requested n_components >= original feature dimension; returning original X")
+        return X, None
+
+    svd = TruncatedSVD(n_components=n_components, random_state=random_state)
+    normalizer = Normalizer(copy=False)
+    pipeline = make_pipeline(svd, normalizer)
+
+    X_reduced = pipeline.fit_transform(X)
+    print(f"Reduced shape: {X_reduced.shape}")
+    return X_reduced, pipeline
