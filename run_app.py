@@ -96,11 +96,12 @@ def predict_cluster(text, model_type='kmeans'):
              }
         
         if model_type not in models_data:
-            model_type = 'kmeans'
-            
-        if model_type not in models_data:
-             # If still not found (e.g. empty models_data), return error
-             return {'error': 'No models available'}
+            # Try fallback to 'kmeans' if requested model not found
+            if 'kmeans' in models_data:
+                model_type = 'kmeans'
+            else:
+                # If no models available, return error
+                return {'error': 'No models available'}
 
         model_data = models_data[model_type]
         
@@ -158,9 +159,6 @@ def predict_cluster(text, model_type='kmeans'):
         import traceback
         traceback.print_exc()
         return {'error': str(e)}
-    except Exception as e:
-        print(f"Prediction error: {e}")
-        return None
 
 
 # HTML Template with all functionality embedded

@@ -74,7 +74,8 @@ class TextPreprocessor:
 
     def tokenize_and_lemmatize(self, text):
         """Tokenize and lemmatize text"""
-        # Tokenize using simple regex to avoid NLTK hang
+        # Tokenize using simple regex to avoid NLTK hang issues that can occur
+        # with word_tokenize() on certain input texts containing malformed Unicode or special characters
         tokens = re.findall(r'\b\w+\b', text.lower())
 
         # Remove stopwords and lemmatize
