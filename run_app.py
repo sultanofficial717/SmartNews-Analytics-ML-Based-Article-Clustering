@@ -69,21 +69,8 @@ def predict_cluster(text, model_type='kmeans'):
         # Get common components
         vectorizer = predictor_data['vectorizer']
         
-        # Handle legacy model format
-        if 'models' not in predictor_data and 'model' in predictor_data:
-             model_data = {
-                 'model': predictor_data['model'],
-                 'keywords': predictor_data.get('cluster_keywords', {})
-             }
-             model_type = 'kmeans'
-        else:
-             if model_type not in models_data:
-                model_type = 'kmeans'
-             model_data = models_data[model_type]
-             
-        model = model_data['model']
-        keywords = model_data.get('keywords', {})
-        centroids = model_data.get('centroids')
+        # Vectorize the processed text
+        text_vector = vectorizer.transform([processed_text]).toarray()
         
         # Get specific model data
         models_data = predictor_data.get('models', {})
@@ -697,7 +684,6 @@ HTML_TEMPLATE = '''
                 <select id="model-select">
                     <option value="kmeans">K-Means (Default)</option>
                     <option value="hierarchical">Hierarchical Clustering</option>
-                    <option value="dbscan">DBSCAN</option>
                 </select>
             </div>
 

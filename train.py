@@ -275,7 +275,7 @@ def train_clustering_pipeline(n_clusters=5):
     
     # Generate Visualization
     plot_path = STATIC_DIR / 'cluster_plot.png'
-    generate_cluster_plot(X_features, kmeans_labels, plot_path)
+    generate_cluster_plot(X, kmeans_labels, plot_path)
 
     # Step 4b: Apply Hierarchical
     print(f"\n🎯 Applying Hierarchical clustering with {n_clusters} clusters...")
