@@ -5,11 +5,11 @@ from .clustering import (
     extract_tfidf_features,
     apply_kmeans,
     apply_hierarchical,
-    apply_dbscan,
     extract_top_keywords,
     compute_centroids,
     reduce_dimensions,
-    tune_lsa_kmeans
+    tune_lsa_kmeans,
+    analyze_silhouette_scores
 )
 from .predictor import NewsClusterPredictor
 from .embeddings import OpenRouterEmbeddingGenerator
@@ -19,7 +19,6 @@ __all__ = [
     'extract_tfidf_features',
     'apply_kmeans',
     'apply_hierarchical',
-    'apply_dbscan',
     'extract_top_keywords',
     'compute_centroids',
     'reduce_dimensions',

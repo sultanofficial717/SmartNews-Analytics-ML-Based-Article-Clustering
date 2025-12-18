@@ -1,7 +1,7 @@
 """Clustering algorithms module"""
 
 import numpy as np
-from sklearn.cluster import KMeans, AgglomerativeClustering, DBSCAN
+from sklearn.cluster import KMeans, AgglomerativeClustering
 from sklearn.metrics import silhouette_score, davies_bouldin_score
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.decomposition import TruncatedSVD
@@ -13,17 +13,13 @@ def extract_tfidf_features(documents, max_features=1000, ngram_range=(1, 2)):
     """Convert text to TF-IDF vectors"""
     print(f"Extracting TF-IDF features (max_features={max_features})...")
 
-    # Adjust parameters for small datasets
-    n_docs = len(documents)
-    min_df = 2 if n_docs >= 5 else 1
-    # Lower max_df to remove more common words that might blur clusters
-    max_df = 0.5 if n_docs >= 5 else 1.0
-
+    # User requested parameters
     vectorizer = TfidfVectorizer(
         max_features=max_features,
-        ngram_range=ngram_range,
-        min_df=min_df,
-        max_df=max_df
+        max_df=0.8,      # remove too common words
+        min_df=5,        # remove rare noise
+        ngram_range=(1,2), # capture phrases
+        sublinear_tf=True
     )
 
     X = vectorizer.fit_transform(documents)
@@ -94,28 +90,6 @@ def apply_hierarchical(X, n_clusters=5):
     return labels, hierarchical, scores
 
 
-def apply_dbscan(X, eps=0.5, min_samples=5):
-    """Apply DBSCAN clustering"""
-    print(f"\nApplying DBSCAN (eps={eps}, min_samples={min_samples})...")
-    dbscan = DBSCAN(eps=eps, min_samples=min_samples)
-    labels = dbscan.fit_predict(X)
-
-    n_clusters = len(set(labels)) - (1 if -1 in labels else 0)
-    n_noise = list(labels).count(-1)
-
-    print(f"Number of clusters: {n_clusters}")
-    print(f"Number of noise points: {n_noise}")
-
-    scores = {}
-    if n_clusters > 1 and n_clusters < X.shape[0]:
-        try:
-            silhouette = silhouette_score(X[labels != -1], labels[labels != -1])
-            print(f"Silhouette Score: {silhouette:.3f}")
-            scores = {'silhouette': silhouette}
-        except Exception as e:
-            print(f"Could not calculate metrics: {e}")
-
-    return labels, dbscan, scores
 
 
 def extract_top_keywords(X, feature_names, labels, n_keywords=10):
@@ -215,3 +189,59 @@ def tune_lsa_kmeans(X_tfidf, max_components=50, max_clusters=10, fixed_n_cluster
                 
     print(f"[TUNING] Best parameters found: {best_params} with Silhouette Score: {best_score:.3f}")
     return best_params
+
+
+def analyze_silhouette_scores(X, max_k=15, output_path=None):
+    """Analyze silhouette scores for a range of k values and generate a plot"""
+    import matplotlib.pyplot as plt
+    
+    print(f"\n{'='*60}")
+    print(f"{'SILHOUETTE SCORE ANALYSIS':^60}")
+    print(f"{'='*60}")
+    print(f"{'Clusters (k)':<15} | {'Silhouette Score':<20} | {'Performance':<15}")
+    print(f"{'-'*15}-+-{'-'*20}-+-{'-'*15}")
+    
+    scores = []
+    k_values = range(2, max_k)
+    
+    best_k = 2
+    best_score = -1
+    
+    for k in k_values:
+        model = KMeans(n_clusters=k, random_state=42, n_init=10)
+        labels = model.fit_predict(X)
+        score = silhouette_score(X, labels)
+        scores.append(score)
+        
+        if score > best_score:
+            best_score = score
+            best_k = k
+            
+        # Determine performance label
+        if score > 0.7: perf = "Excellent"
+        elif score > 0.5: perf = "Good"
+        elif score > 0.25: perf = "Fair"
+        else: perf = "Poor"
+        
+        print(f"{k:<15} | {score:<20.4f} | {perf:<15}")
+        
+    print(f"{'='*60}")
+    print(f"Best configuration: k={best_k} with score {best_score:.4f}")
+    print(f"{'='*60}\n")
+    
+    if output_path:
+        print(f"Generating silhouette analysis plot to {output_path}...")
+        plt.figure(figsize=(10, 6))
+        plt.plot(k_values, scores, 'bo-', linewidth=2, markersize=8)
+        plt.title('Silhouette Score vs. Number of Clusters')
+        plt.xlabel('Number of Clusters (k)')
+        plt.ylabel('Silhouette Score')
+        plt.grid(True, alpha=0.3)
+        
+        # Highlight best score
+        plt.plot(best_k, best_score, 'r*', markersize=15, label=f'Best (k={best_k})')
+        plt.legend()
+        
+        plt.savefig(output_path, dpi=300, bbox_inches='tight')
+        plt.close()
+        print("[OK] Silhouette plot saved")

@@ -119,7 +119,7 @@ def predict_cluster(text, model_type='kmeans'):
             
             keywords = model_data['keywords'].get(cluster, [])[:10]
 
-        elif model_type in ['hierarchical', 'dbscan']:
+        elif model_type == 'hierarchical':
             # For these, we use nearest centroid classification
             centroids_dict = model_data.get('centroids', {})
             
@@ -313,11 +313,40 @@ HTML_TEMPLATE = '''
             margin-top: 5px;
         }
 
+        .btn-viz {
+            flex: 1;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            padding: 5px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.75rem;
+            transition: all 0.2s;
+        }
+
+        .btn-viz:hover {
+            background: var(--border);
+            color: var(--text);
+        }
+
+        .btn-viz.active {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+
         .plot-container {
-            margin-top: 20px;
+            margin-top: 10px;
             border-radius: 10px;
             overflow: hidden;
             border: 1px solid var(--border);
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .plot-container:hover {
+            border-color: var(--accent);
         }
 
         .plot-container img {
@@ -547,6 +576,60 @@ HTML_TEMPLATE = '''
         ::-webkit-scrollbar-thumb:hover {
             background: var(--text-muted);
         }
+        /* Dendrogram Modal */
+        .dendrogram-modal {
+            display: none;
+            position: fixed;
+            z-index: 2000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.9);
+            backdrop-filter: blur(5px);
+            overflow: auto;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .dendrogram-modal.show {
+            display: flex;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .dendrogram-content {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            max-width: 90%;
+            max-height: 90%;
+            overflow: auto;
+            position: relative;
+            padding: 20px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+        }
+
+        .dendrogram-content img {
+            max-width: 100%;
+            height: auto;
+            display: block;
+            border-radius: 8px;
+        }
+
+        .close-dendrogram {
+            position: absolute;
+            top: 15px;
+            right: 20px;
+            color: var(--text-muted);
+            font-size: 2rem;
+            cursor: pointer;
+            z-index: 10;
+            transition: color 0.2s;
+        }
+
+        .close-dendrogram:hover {
+            color: var(--text);
+        }
     </style>
 </head>
 <body>
@@ -559,7 +642,7 @@ HTML_TEMPLATE = '''
         <div class="navbar-actions">
             <button class="nav-btn" title="Settings"><i class="fas fa-cog"></i></button>
             <button class="nav-btn" title="Help"><i class="fas fa-question-circle"></i></button>
-            <button class="nav-btn" title="GitHub"><i class="fab fa-github"></i></button>
+            <a href="https://github.com/sultanofficial717/SmartNews-Analytics-ML-Based-Article-Clustering.git" target="_blank" class="nav-btn" title="GitHub"><i class="fab fa-github"></i></a>
         </div>
     </nav>
 
@@ -595,8 +678,27 @@ HTML_TEMPLATE = '''
                 <div class="sidebar-header" style="margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border);">
                     <i class="fas fa-project-diagram"></i> Cluster Visualization
                 </div>
+                <div class="form-group">
+                    <label class="form-label">Feature Representation</label>
+                    <div style="display: flex; gap: 10px;">
+                        <button class="btn-viz active" id="btn-tfidf" onclick="selectRep('lsa_tfidf')">LSA+TF-IDF</button>
+                        {% if has_embedding %}
+                        <button class="btn-viz" id="btn-emb" onclick="selectRep('embedding')">Embedding</button>
+                        {% else %}
+                        <button class="btn-viz" id="btn-emb" disabled style="opacity: 0.5; cursor: not-allowed;" title="Embedding model not available">Embedding</button>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="viz-controls" style="display: flex; gap: 5px; margin-bottom: 10px; flex-wrap: wrap;">
+                    <button class="btn-viz active" onclick="changePlot('kmeans')" title="K-Means">KM</button>
+                    <button class="btn-viz" onclick="changePlot('hierarchical')" title="Hierarchical">HC</button>
+                    <button class="btn-viz" onclick="changePlot('dendrogram')" title="Dendrogram">Tree</button>
+                </div>
                 <div class="plot-container">
-                    <img src="{{ url_for('static', filename='cluster_plot.png') }}" alt="Cluster Plot" onerror="this.style.display='none'">
+                    <img id="viz-image" src="{{ url_for('static', filename='kmeans_plot_tfidf.png') }}" alt="Cluster Plot" onclick="openModal(this.src)">
+                </div>
+                <div style="text-align: center; font-size: 0.75rem; color: var(--text-muted); margin-top: 5px;">
+                    Click image to enlarge
                 </div>
             </div>
         </aside>
@@ -618,7 +720,6 @@ HTML_TEMPLATE = '''
                         <select id="model-select" class="form-select">
                             <option value="kmeans">K-Means Clustering (Recommended)</option>
                             <option value="hierarchical">Hierarchical Clustering</option>
-                            <option value="dbscan">DBSCAN</option>
                         </select>
                     </div>
 
@@ -669,7 +770,80 @@ HTML_TEMPLATE = '''
         </main>
     </div>
 
+    <!-- Image Modal -->
+    <div id="imageModal" class="dendrogram-modal">
+        <div class="dendrogram-content">
+            <span class="close-dendrogram" onclick="closeImageModal()">&times;</span>
+            <h3 id="modalTitle" style="margin-bottom: 20px; color: var(--primary); text-align: center;">Visualization</h3>
+            <img id="modalImage" src="" alt="Visualization">
+        </div>
+    </div>
+
     <script>
+        // Representation selection
+        let currentRep = 'lsa_tfidf';
+        function selectRep(rep) {
+            currentRep = rep;
+            document.getElementById('btn-tfidf').classList.toggle('active', rep === 'lsa_tfidf');
+            document.getElementById('btn-emb').classList.toggle('active', rep === 'embedding');
+            // Reset plot to kmeans for new rep
+            changePlot('kmeans');
+        }
+
+        // Visualization Logic
+        function changePlot(type) {
+            const img = document.getElementById('viz-image');
+            const plotMap = {
+                'lsa_tfidf': {
+                    'kmeans': 'kmeans_plot_tfidf.png',
+                    'hierarchical': 'hierarchical_plot_tfidf.png',
+                    'dendrogram': 'dendrogram_tfidf.png'
+                },
+                'embedding': {
+                    'kmeans': 'kmeans_plot_emb.png',
+                    'hierarchical': 'hierarchical_plot_emb.png',
+                    'dendrogram': 'dendrogram_emb.png'
+                }
+            };
+            let filename = plotMap[currentRep][type];
+            let title = '';
+            switch(type) {
+                case 'kmeans':
+                    title = (currentRep === 'embedding') ? 'K-Means Clustering (Embedding)' : 'K-Means Clustering (LSA+TF-IDF)';
+                    break;
+                case 'hierarchical':
+                    title = (currentRep === 'embedding') ? 'Hierarchical Clustering (Embedding)' : 'Hierarchical Clustering (LSA+TF-IDF)';
+                    break;
+                case 'dendrogram':
+                    title = (currentRep === 'embedding') ? 'Hierarchical Dendrogram (Embedding)' : 'Hierarchical Dendrogram (LSA+TF-IDF)';
+                    break;
+            }
+            img.src = "{{ url_for('static', filename='') }}" + filename;
+            img.dataset.title = title;
+        }
+
+        function openModal(src) {
+            const modal = document.getElementById('imageModal');
+            const modalImg = document.getElementById('modalImage');
+            const modalTitle = document.getElementById('modalTitle');
+            const currentImg = document.getElementById('viz-image');
+            
+            modalImg.src = currentImg.src;
+            modalTitle.textContent = currentImg.dataset.title || 'Visualization';
+            modal.classList.add('show');
+        }
+
+        function closeImageModal() {
+            document.getElementById('imageModal').classList.remove('show');
+        }
+
+        // Close on outside click
+        document.getElementById('imageModal').addEventListener('click', (e) => {
+            if (e.target === document.getElementById('imageModal')) {
+                closeImageModal();
+            }
+        });
+
         // Sidebar Toggle
         const sidebar = document.getElementById('sidebar');
         const toggleBtn = document.getElementById('toggleSidebar');
@@ -760,12 +934,15 @@ HTML_TEMPLATE = '''
 def home():
     """Home page"""
     scores = {}
+    has_embedding = False
     if predictor_data and 'models' in predictor_data:
         for model_name, model_info in predictor_data['models'].items():
-            if 'scores' in model_info:
-                scores[model_name] = model_info['scores']
+            if model_name == 'embedding':
+                has_embedding = True
+            if 'kmeans' in model_info and 'scores' in model_info['kmeans']:
+                scores[model_name] = model_info['kmeans']['scores']
     
-    return render_template_string(HTML_TEMPLATE, model_loaded=model_loaded, scores=scores)
+    return render_template_string(HTML_TEMPLATE, model_loaded=model_loaded, scores=scores, has_embedding=has_embedding)
 
 
 @app.route('/api/status')

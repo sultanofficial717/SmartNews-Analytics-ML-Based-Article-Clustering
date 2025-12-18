@@ -3,7 +3,7 @@ import numpy as np
 import time
 
 class OpenRouterEmbeddingGenerator:
-    def __init__(self, api_key, model="mistralai/devstral-2512"):
+    def __init__(self, api_key, model="openai/text-embedding-3-small"):
         self.api_key = api_key
         self.model = model
         self.api_url = "https://openrouter.ai/api/v1/embeddings"
